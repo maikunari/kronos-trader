@@ -1,0 +1,53 @@
+trading:
+  symbol: "SOL"
+  timeframe: "15m"       # 1m, 5m, 15m
+  rr_ratio: 2.0
+  stop_pct: 0.002        # 0.2% stop loss
+  target_pct: 0.004      # 0.4% take profit (2x stop)
+  min_move_threshold: 0.003  # minimum predicted move to enter trade (0.3%)
+
+risk:
+  max_position_pct: 0.10          # 10% of account per trade
+  daily_loss_limit_pct: 0.03      # halt trading if down 3% on the day
+  max_concurrent_positions: 1
+
+backtest:
+  start_date: "2024-01-01"
+  end_date: "2025-01-01"
+  initial_capital: 10000.0
+  fee_rate: 0.00035      # 0.035% taker per side
+  slippage_rate: 0.0002  # 0.02% slippage per side
+  data_source: "hyperliquid"  # hyperliquid | binance
+
+models:
+  kronos_model_size: "mini"         # mini (4.1M) | base | large
+  timesfm_model: "timesfm-1.0-200m-pytorch"
+  lookback_candles: 64              # history candles to feed models
+  trend_horizon: 10                 # candles ahead for TimesFM trend
+  model_cache_dir: "./model_cache"
+
+hyperliquid:
+  mainnet: true
+  wallet_address: ""   # loaded from .env if empty
+  private_key: ""      # loaded from .env if empty
+
+# Multi-timeframe trend filter
+# Only takes 15m entries when 1H AND 4H agree on trend direction
+mtf:
+  enabled: true
+  require_both: true           # true = 4H AND 1H must agree; false = 4H only
+  ema_fast: 20
+  ema_slow: 50
+  ema_fast_search: [10, 20]    # values to search during optimization
+  ema_slow_search: [40, 50]
+
+# Walk-forward optimizer
+optimizer:
+  enabled: true
+  min_trades_to_retune: 30     # don't retune until this many trades since last
+  max_days_to_retune: 14       # retune at least every N days regardless
+  emergency_win_rate_threshold: 0.35  # emergency retune if rolling 7d WR drops below
+  min_days_between_retunes: 7  # cooldown between retunes
+  in_sample_days: 60           # optimization window
+  out_of_sample_days: 14       # held-out validation window
+  min_out_of_sample_pf: 1.0    # only apply params if OOS profit factor >= this
