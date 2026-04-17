@@ -1,0 +1,7 @@
+# Baseline Donchian + regime grid.
+# Use with: python optimizer.py --grid grids/donchian_basic.yaml
+donchian_period: [15, 20, 30]
+stop_atr_mult: [1.0, 1.5, 2.0]
+adx_threshold: [18, 20, 25]
+hurst_threshold: [0.45, 0.50]
+supertrend_mult: [2.5, 3.0]
