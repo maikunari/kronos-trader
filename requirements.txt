@@ -9,8 +9,8 @@ websocket-client>=1.6
 # Hyperliquid
 hyperliquid-python-sdk>=0.9
 
-# Indicators
-pandas-ta>=0.3.14b
+# Indicators (Donchian, Keltner, ADX, Bollinger, ATR; SuperTrend + Hurst rolled in-repo)
+ta>=0.11.0
 
 # Backtest / reporting
 matplotlib>=3.7
