@@ -1,53 +1,77 @@
+# ================================================================
+# Phase 1 sniper config.
+# Consumed by main.py, run_periods.py, and (via build_engine) optimizer.py.
+# ================================================================
+
 trading:
-  symbol: "SOL"
-  timeframe: "15m"       # 1m, 5m, 15m
-  rr_ratio: 2.0
-  stop_pct: 0.002        # 0.2% stop loss
-  target_pct: 0.004      # 0.4% take profit (2x stop)
-  min_move_threshold: 0.003  # minimum predicted move to enter trade (0.3%)
+  symbol: "BTC"              # Phase 1 primary: BTC. Also BTC/ETH universe.
+  timeframe: "15m"
 
 risk:
-  max_position_pct: 0.10          # 10% of account per trade
-  daily_loss_limit_pct: 0.03      # halt trading if down 3% on the day
+  # Vol targeting — default primary sizer
+  target_annual_vol: 0.20    # target ~20% annualized account vol
+  max_position_pct: 0.25     # hard cap per trade
   max_concurrent_positions: 1
 
+  # Kill switches
+  daily_loss_limit_pct: 0.03
+  consecutive_loss_limit: 3
+  consecutive_loss_cooloff_seconds: 3600
+  weekly_drawdown_halve_pct: 0.08
+  tripwire_file: "halt.flag" # delete the file to resume; touch it to halt
+
+  # Optional fractional-Kelly overlay (0.0 = disabled)
+  kelly_fraction: 0.0
+
+# Regime gate — skip in chop
+regime:
+  adx_period: 14
+  adx_threshold: 20.0        # skip below this
+  hurst_window: 200
+  hurst_threshold: 0.50      # skip below this
+  rv_window: 96              # 24h at 15m
+  rv_hist_window: 2880       # 30d rolling for quintile bucketing
+
+# Snipe signal engine — breakouts + microstructure
+snipe:
+  lookback_candles: 300
+  donchian_period: 20
+  keltner_period: 20
+  keltner_atr_mult: 2.0
+  atr_period: 14
+  stop_atr_mult: 1.5
+  target_atr_mult: 3.0       # 2:1 R:R
+  supertrend_period: 10
+  supertrend_mult: 3.0
+  funding_veto_pct_hourly: 0.0003   # 0.03%/hr — veto longs > this, shorts < -this
+  composite_threshold: 0.0          # require composite score >= 0 (not net negative)
+
+# Execution quality — post-only first, taker fallback
+execution:
+  post_only_first: true
+  taker_timeout_ms: 3000     # drop to taker after this
+  retreat_bps: 10.0          # cancel if mid drifts > this against intent
+  max_book_fraction: 0.30    # iceberg: child orders at 30% of top-5 depth
+  spread_anomaly_mult: 5.0   # skip new entries when spread > N × rolling median
+  enable_taker_fallback: true
+
+# Backtest + cost model
 backtest:
   start_date: "2024-01-01"
-  end_date: "2025-01-01"
+  end_date: "2024-12-31"
   initial_capital: 10000.0
-  fee_rate: 0.00035      # 0.035% taker per side
-  slippage_rate: 0.0002  # 0.02% slippage per side
-  data_source: "hyperliquid"  # hyperliquid | binance
+  fee_rate: 0.00035          # HL taker 3.5 bps per side
+  slippage_base_bps: 2.0     # flat component
+  slippage_atr_frac: 0.05    # additional: fraction of current ATR
+  funding_rate_hourly: 0.0   # fallback when no funding history provided
+  use_chandelier_trail: true
+  chandelier_atr_mult: 3.0
+  max_hold_bars: 0           # 0 = no timeout
 
-models:
-  kronos_model_size: "mini"         # mini (4.1M) | base | large
-  timesfm_model: "timesfm-1.0-200m-pytorch"
-  lookback_candles: 64              # history candles to feed models
-  trend_horizon: 10                 # candles ahead for TimesFM trend
-  model_cache_dir: "./model_cache"
-
+# Hyperliquid — credentials come from .env
 hyperliquid:
   mainnet: true
-  wallet_address: ""   # loaded from .env if empty
-  private_key: ""      # loaded from .env if empty
 
-# Multi-timeframe trend filter
-# Only takes 15m entries when 1H AND 4H agree on trend direction
-mtf:
-  enabled: true
-  require_both: true           # true = 4H AND 1H must agree; false = 4H only
-  ema_fast: 20
-  ema_slow: 50
-  ema_fast_search: [10, 20]    # values to search during optimization
-  ema_slow_search: [40, 50]
-
-# Walk-forward optimizer
-optimizer:
-  enabled: true
-  min_trades_to_retune: 30     # don't retune until this many trades since last
-  max_days_to_retune: 14       # retune at least every N days regardless
-  emergency_win_rate_threshold: 0.35  # emergency retune if rolling 7d WR drops below
-  min_days_between_retunes: 7  # cooldown between retunes
-  in_sample_days: 60           # optimization window
-  out_of_sample_days: 14       # held-out validation window
-  min_out_of_sample_pf: 1.0    # only apply params if OOS profit factor >= this
+# Alerts — webhook URL also falls back to env ALERT_WEBHOOK_URL
+alerts:
+  webhook_url: ""
