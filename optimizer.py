@@ -28,11 +28,22 @@ import pandas as pd
 import yaml
 
 from backtest import WalkForwardFold, walk_forward
-from hyperliquid_feed import fetch_historical_binance, fetch_historical_hl
+from hyperliquid_feed import TIMEFRAME_MS, fetch_historical_binance, fetch_historical_hl
 from regime import RegimeDetector
 from snipe_signal_engine import SnipeSignalEngine
 
 logger = logging.getLogger(__name__)
+
+
+def bars_per_year_for(timeframe: str) -> int:
+    """Annualization factor for the Sharpe computation.
+
+    365.25 days/yr × 24h × 60min = 525,960 min/yr (crypto trades 24/7).
+    """
+    interval_ms = TIMEFRAME_MS.get(timeframe)
+    if not interval_ms:
+        raise ValueError(f"Unknown timeframe: {timeframe!r}")
+    return int(525_960 * 60_000 / interval_ms)
 
 
 # ------------------------------------------------------------------
@@ -195,12 +206,15 @@ def main() -> int:
             rec["total_trades"], rec["params"],
         )
 
+    # Auto-infer bars_per_year so Sharpe is correctly annualized at any timeframe
+    backtest_kwargs = {"bars_per_year": bars_per_year_for(args.timeframe)}
     results = grid_search(
         df, grid,
         in_sample_days=args.in_sample_days,
         out_of_sample_days=args.oos_days,
         embargo_days=args.embargo_days,
         progress=progress,
+        backtest_kwargs=backtest_kwargs,
     )
     Path(args.out).write_text(json.dumps({
         "symbol": args.symbol, "timeframe": args.timeframe,
