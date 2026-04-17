@@ -1,7 +1,14 @@
 """
 atr_engine.py
-Pure math-based ATR Trend Following signal engine.
-No ML models. Just EMA crossovers + ATR-based risk management.
+ATR utilities and the legacy EMA-pullback signal engine.
+
+Shared primitives live at module level — _ema, _atr, plus the new
+chandelier_exit_level and ChandelierTrail used by the Phase 1 sniper
+for volatility-scaled trailing exits.
+
+The ATREngine class is the legacy pullback-on-EMA strategy and is retained
+only for backwards compat with derivatives_backtest. It will be removed
+once the Phase 1 backtest supersedes it.
 """
 
 import logging
@@ -52,6 +59,88 @@ def _atr(high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int = 14)
     for i in range(1, len(tr)):
         atr[i] = tr[i] * alpha + atr[i - 1] * (1 - alpha)
     return atr
+
+
+# ---------------------------------------------------------------------------
+# Chandelier trailing exit
+# ---------------------------------------------------------------------------
+
+def chandelier_exit_level(
+    candles: pd.DataFrame,
+    direction: str,
+    period: int = 22,
+    atr_mult: float = 3.0,
+) -> float:
+    """
+    Current Chandelier exit price for a position in `direction`.
+
+    For a long:  max(high, over `period`) - atr_mult * ATR(period)
+    For a short: min(low,  over `period`) + atr_mult * ATR(period)
+
+    Returns 0.0 if insufficient data.
+
+    This function is stateless and does NOT enforce the ratcheting invariant
+    (stop monotone in position-favorable direction). Use ChandelierTrail
+    when you need the ratchet.
+    """
+    if direction not in ("long", "short"):
+        raise ValueError(f"direction must be 'long' or 'short', got {direction!r}")
+    if len(candles) < period + 1:
+        return 0.0
+
+    high = candles["high"].to_numpy(dtype=float)
+    low = candles["low"].to_numpy(dtype=float)
+    close = candles["close"].to_numpy(dtype=float)
+
+    atr_vals = _atr(high, low, close, period)
+    atr = float(atr_vals[-1])
+    if atr <= 0:
+        return 0.0
+
+    if direction == "long":
+        return float(high[-period:].max() - atr_mult * atr)
+    return float(low[-period:].min() + atr_mult * atr)
+
+
+class ChandelierTrail:
+    """Ratcheting trailing stop for an open position.
+
+    Call `update(bar_high, bar_low, bar_close, atr_now)` on each closed bar;
+    the trail only moves in the favorable direction (up for longs, down for
+    shorts). Returns the current stop level.
+
+    Use `atr_engine.chandelier_exit_level` to compute the raw untethered
+    level off a full dataframe; this class is for live/backtest stepping
+    where you need to enforce the ratchet across bars.
+    """
+
+    def __init__(self, direction: str, atr_mult: float = 3.0) -> None:
+        if direction not in ("long", "short"):
+            raise ValueError(f"direction must be 'long' or 'short', got {direction!r}")
+        self.direction = direction
+        self.atr_mult = atr_mult
+        self._extreme: Optional[float] = None   # highest high for long, lowest low for short
+        self._stop: Optional[float] = None
+
+    @property
+    def stop(self) -> Optional[float]:
+        return self._stop
+
+    def update(self, high: float, low: float, atr: float) -> Optional[float]:
+        """Advance one bar. Returns current stop level (or None before first update)."""
+        if atr <= 0:
+            return self._stop
+        if self.direction == "long":
+            if self._extreme is None or high > self._extreme:
+                self._extreme = high
+            candidate = self._extreme - self.atr_mult * atr
+            self._stop = candidate if self._stop is None else max(self._stop, candidate)
+        else:
+            if self._extreme is None or low < self._extreme:
+                self._extreme = low
+            candidate = self._extreme + self.atr_mult * atr
+            self._stop = candidate if self._stop is None else min(self._stop, candidate)
+        return self._stop
 
 
 class ATREngine:
