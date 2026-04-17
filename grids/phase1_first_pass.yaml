@@ -1,0 +1,11 @@
+# Phase 1 first-pass grid: targets the two failure modes of the
+# default-params BTC 2024 baseline (-71% return, 1,179 trades):
+#   1. Regime gate too permissive -> adx_threshold higher
+#   2. Short Donchian picks noise -> longer period
+#   3. Tight stops get chopped -> wider stops
+#
+# 3 * 2 * 2 = 12 combinations. Expect ~15 min on 9 months of 15m data
+# with the purged walk-forward defaults (60d IS / 14d OOS / 14d step).
+adx_threshold:   [25, 30, 35]
+donchian_period: [30, 50]
+stop_atr_mult:   [1.5, 2.5]

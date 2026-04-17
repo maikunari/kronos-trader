@@ -106,3 +106,31 @@ exactly in `tests/test_integration.py`:
 - fees = $217.58, slippage = $240.45
 
 Update these deliberately only when the pipeline changes semantics.
+
+## Deferred ideas (Phase 2+)
+
+### X Cashtags / social sentiment
+
+X launched iPhone Cashtags (Apr 2026) surfacing stock/crypto chatter
+with inline price charts. Not useful for Phase 1 because:
+
+- BTC and ETH are too institutional — retail chatter is a lagging
+  indicator, dominated by funding-rate and book positioning which
+  we already consume.
+- 15m bars are too fast for social sentiment signal; by the time
+  chatter volume builds, price has moved.
+- No Cashtag-specific API. Pulling equivalent data needs X API v2
+  ($100–$5,000/mo) or aggregators (LunarCrush, Santiment). All
+  add dependency + cost.
+- Social-from-alpha is a crowded trade on liquid majors.
+
+Where it may matter later:
+- **Phase 2 LightGBM** — one of ~100 features, with appropriate lag,
+  could contribute bps of edge in ensemble.
+- **Phase 3 portfolio expansion to meme / small-caps** — retail-
+  chatter-driven price is real on HYPE, PEPE, etc.
+- **Circuit breaker** — anomalous chatter spike across finance-X
+  could trigger defensive flatten. Narrow, not alpha.
+
+Default plumbing when this becomes worth building: LunarCrush or
+Santiment REST API (aggregates X + Reddit + Discord), not X direct.
