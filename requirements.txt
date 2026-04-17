@@ -19,6 +19,9 @@ scipy>=1.11
 # Utilities
 aiohttp>=3.9
 
+# Dashboard (optional; not required for headless backtests or live loop)
+streamlit>=1.30
+
 # Test
 pytest>=8.0
 pytest-cov>=5.0
