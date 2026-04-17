@@ -2,12 +2,21 @@
 executor.py
 Hyperliquid order execution layer.
 Supports live and paper trading modes.
+
+Two entry points:
+- market_open / market_close: legacy direct-market orders (backtest,
+  simple live fallback).
+- place_entry(intent, book): uses ExecutionPolicy to choose post-only
+  vs taker, cap by book depth, and skip on spread anomalies.
 """
 
 import logging
 import os
+import time
 from dataclasses import dataclass
 from typing import Optional
+
+from execution_policy import BookSnapshot, ExecutionPolicy, OrderDecision, OrderIntent
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +40,17 @@ class Executor:
     In live mode: uses hyperliquid-python-sdk to place real orders.
     """
 
-    def __init__(self, mode: str = "paper", mainnet: bool = True):
+    def __init__(
+        self,
+        mode: str = "paper",
+        mainnet: bool = True,
+        execution_policy: Optional[ExecutionPolicy] = None,
+    ):
         if mode not in ("live", "paper"):
             raise ValueError(f"Invalid mode: {mode}. Use 'live' or 'paper'.")
         self.mode = mode
         self.mainnet = mainnet
+        self.execution_policy = execution_policy
         self._exchange = None
         self._info = None
 
@@ -123,6 +138,84 @@ class Executor:
                 side=side,
                 mode="live",
                 error=str(e),
+            )
+
+    def place_entry(
+        self,
+        symbol: str,
+        intent: OrderIntent,
+        book: BookSnapshot,
+        *,
+        elapsed_ms: int = 0,
+    ) -> OrderResult:
+        """
+        Place an entry order using the configured ExecutionPolicy.
+
+        Paper mode simulates realistic fill price:
+          post_only -> fills at intent price (we sat passive, got filled)
+          market    -> fills at the opposite-side best quote (we crossed)
+          skip      -> returns unsuccessful with the skip reason in `error`
+
+        Live mode:
+          post_only -> HL limit order with tif="Alo" (Add Liquidity Only)
+          market    -> HL market_open (crossing taker)
+          skip      -> no-op; returns unsuccessful
+        """
+        if self.execution_policy is None:
+            raise RuntimeError("Executor.execution_policy is not configured")
+        decision = self.execution_policy.decide_entry(intent, book, elapsed_ms=elapsed_ms)
+        side = "long" if intent.side == "buy" else "short"
+
+        if decision.order_type == "skip":
+            logger.info("[EXEC] skip %s %s: %s", symbol, intent.side, decision.reason)
+            return OrderResult(
+                success=False, order_id=None, filled_price=0.0,
+                size=0.0, side=side, mode=self.mode, error=decision.reason,
+            )
+
+        # Record observed spread for anomaly-detector history
+        self.execution_policy.spread_history.add(book.spread_pct)
+
+        if self.mode == "paper":
+            if decision.order_type == "post_only":
+                fill = float(decision.price) if decision.price is not None else book.mid
+            else:
+                fill = book.ask if intent.side == "buy" else book.bid
+            logger.info(
+                "[PAPER] %s %s %s sz=%.4f @ %.6f (%s)",
+                decision.order_type.upper(), intent.side.upper(), symbol,
+                decision.size, fill, decision.reason,
+            )
+            return OrderResult(
+                success=True, order_id=f"paper-{int(time.time() * 1000)}",
+                filled_price=fill, size=decision.size, side=side, mode="paper",
+            )
+
+        # Live mode
+        self._load_client()
+        is_buy = intent.side == "buy"
+        try:
+            if decision.order_type == "post_only":
+                result = self._exchange.order(
+                    symbol, is_buy, decision.size, decision.price,
+                    {"limit": {"tif": "Alo"}},   # Add Liquidity Only = post-only
+                )
+            else:
+                result = self._exchange.market_open(symbol, is_buy, decision.size)
+            filled_price = float(
+                result.get("response", {}).get("data", {}).get("statuses", [{}])[0]
+                .get("filled", {}).get("avgPx", book.mid)
+            )
+            return OrderResult(
+                success=True, order_id=str(result),
+                filled_price=filled_price, size=decision.size,
+                side=side, mode="live",
+            )
+        except Exception as exc:
+            logger.error("Order failed: %s", exc)
+            return OrderResult(
+                success=False, order_id=None, filled_price=0.0,
+                size=decision.size, side=side, mode="live", error=str(exc),
             )
 
     def market_close(self, symbol: str, side: str, size_contracts: float, current_price: float) -> OrderResult:
