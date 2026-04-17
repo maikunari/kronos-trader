@@ -1,215 +1,168 @@
-# Kronos Trader
+# Kronos Trader — Phase 1 Sniper
 
-A systematic crypto trading bot for Hyperliquid perps with three distinct strategy modules:
+Short-timeframe trend sniper for Hyperliquid perps. Classical
+breakouts + microstructure confirmation, no ML in the hot path. Built
+around honest backtesting, realistic execution, and a strict regime gate.
 
-1. **Kronos/TimesFM** — ML prediction-based scalper (original system)
-2. **Derivatives Engine** — Counter-leverage squeeze plays using funding rate extremes
-3. **Trend Engine** — EMA crossover trend-following with ATR-based stops
+> The previous Kronos/TimesFM ML system was removed because the models
+> were pretrained on off-distribution data (stocks / long-horizon macro),
+> not crypto short-TF. This is the replacement; a LightGBM vetoer can
+> layer on top in Phase 2 once the classical baseline is validated.
 
----
+## Pipeline
 
-## Architecture
+At each 15-minute bar close:
 
-```
-Hyperliquid WebSocket / REST
-         │
-  OHLCV + Funding Rate data
-         │
-  ┌──────┴───────────────────────┐
-  │                              │
-Kronos/TimesFM Engine    Derivatives Engine      Trend/ATR Engine
-(ML prediction scalper)  (funding rate squeeze)  (EMA + ATR trend follow)
-  │                              │                     │
-  └──────────────────┬───────────┘─────────────────────┘
-                     │
-              Signal Engine
-              (D1 MTF gate)
-                     │
-              Risk Manager
-              (size, daily loss limit)
-                     │
-               Executor
-             (paper / live)
-                     │
-              Hyperliquid
-```
-
----
+1. **Regime gate** — `RegimeDetector` requires `ADX(14) ≥ 20` **and**
+   `Hurst(200) ≥ 0.50`. Skip-don't-trade in chop.
+2. **Breakout** — Donchian(20) break of prior-N-bar high/low, or
+   Keltner(20, 2×ATR) channel break. Fresh-break logic: previous close
+   must be on the opposite side of the band.
+3. **1H SuperTrend trend gate** — must agree with breakout direction.
+4. **4H veto** — `MTFFilter.vetoes(direction, which="4h")`: reject
+   entries directly opposing the 4H EMA trend (no AND-gate).
+5. **Funding-rate veto** — reject longs when funding > +0.03%/hr,
+   shorts when funding < −0.03%/hr (paying carry into the move).
+6. **Microstructure composite score** — signed contributions from
+   OI delta, perp-spot basis expansion, CVD slope, and liquidation
+   cluster proximity. Require composite ≥ 0.
+7. **Risk sizing** — `RiskManager` vol-targets size against realized
+   annualized vol, clipped to a hard per-trade cap. Optional
+   fractional-Kelly overlay.
+8. **Entry + stops** — ATR-based initial stop (1.5×) and target (3×) →
+   2:1 R:R. Chandelier trail ratchets the stop once in position.
+9. **Execution** — `ExecutionPolicy` submits post-only-first; falls
+   through to taker after `taker_timeout_ms`; skips if spread is
+   anomalously wide; icebergs large intents by top-of-book depth.
 
 ## Setup
 
-### 1. Clone and install dependencies
-
 ```bash
-git clone https://github.com/maikunari/kronos-trader
+git clone <repo>
 cd kronos-trader
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+
+python3.11 -m venv venv
+./venv/bin/pip install -r requirements.txt
+
+# Credentials (only needed for live mode)
+cp .env.example .env   # then edit
+# HYPERLIQUID_WALLET_ADDRESS=
+# HYPERLIQUID_PRIVATE_KEY=
+# COINGLASS_API_KEY=    # optional, for liquidation clusters
+# ALERT_WEBHOOK_URL=    # optional, Discord/Slack
 ```
 
-### 2. Install Kronos from GitHub (optional, for ML engine)
+## Usage
+
+### Backtest
 
 ```bash
-pip install git+https://github.com/shiyu-coder/Kronos.git
+./venv/bin/python main.py --mode backtest --symbol BTC --start 2024-01-01 --end 2024-12-31
 ```
 
-> If Kronos is not installed, the bot falls back to a statistical baseline model. Backtesting works either way.
+Fetches 15m + 1H + 4H candles from Hyperliquid (Binance fallback for
+15m), runs the full pipeline, prints a metrics summary. Edit
+`config.yaml` to change parameters.
 
-### 3. Configure
+### Multi-period comparison
 
-Edit `config.yaml` to set your target symbol, timeframe, strategy, and risk parameters.
-
-### 4. For live/paper trading: set credentials
+Side-by-side backtests across named windows (Terra, FTX, 2024, YTD):
 
 ```bash
-cp .env.example .env
-# edit .env with your Hyperliquid wallet address and private key
+./venv/bin/python run_periods.py --symbol BTC
+./venv/bin/python run_periods.py --symbol ETH --periods "bull:2023-10-01:2024-04-30"
 ```
 
----
+### Walk-forward grid search
 
-## Strategies
-
-### 1. Kronos/TimesFM Scalper (`signal_engine.py`)
-
-- **Kronos** predicts next candle OHLCV → direction + predicted move %
-- **TimesFM** forecasts next 10 candles → macro trend direction
-- Trade if both agree AND predicted move ≥ `min_move_threshold` (default 0.3%)
-- Default R:R: 1:2 (stop 0.2%, target 0.4%)
-
-### 2. Derivatives / Funding Rate Engine (`derivatives_signal_engine.py`)
-
-Counter-leverage squeeze plays riding forced liquidations:
-- Extreme positive funding + D1 downtrend → **SHORT** the over-leveraged longs
-- Extreme negative funding + D1 uptrend → **LONG** the over-leveraged shorts
-- Funding threshold: 0.05%/hr (Hyperliquid convention). 0.1%/hr = extreme.
-- D1 MTF gate: only trade the squeeze if the daily trend agrees
-
-### 3. Trend / ATR Engine (`trend_signal_engine.py`, `atr_engine.py`)
-
-EMA crossover trend-following with ATR-based dynamic stops:
-- Entry: EMA fast/slow crossover confirmed by D1 EMA(20/50) trend gate
-- Stop: 1.5 × ATR(14) from entry
-- Target: 3.0 × ATR(14) from entry → always 2:1 R:R
-- Default params: EMA fast=9, slow=21, ATR period=14
-
----
-
-## Backtesting
-
-No API keys required — fetches historical data from Hyperliquid (Binance fallback).
+Tunes parameters honestly with purged walk-forward and ranks by
+median OOS Sharpe:
 
 ```bash
-# Default (SOL, 15m)
-./run_backtest.sh
-
-# Custom symbol and timeframe
-./run_backtest.sh ETH 5m
-./run_backtest.sh BTC 15m
-
-# Direct with date range
-python backtest.py --config config.yaml --symbol SOL --timeframe 15m --start 2024-01-01 --end 2024-12-31
-
-# Derivatives engine backtest
-python derivatives_backtest.py
-
-# Trend engine backtest
-python trend_backtest.py
+./venv/bin/python optimizer.py \
+    --symbol BTC --timeframe 15m \
+    --start 2024-01-01 --end 2024-12-31 \
+    --grid grids/donchian_basic.yaml \
+    --out optimizer_results.json
 ```
 
-### Batch & Comparison Tools
+### Paper / live
+
+Paper mode runs the full loop against live data without placing orders:
 
 ```bash
-# Run across multiple symbols/timeframes
-./run_batch.sh
-
-# Compare across three market periods (2024 bull / 2025 drawdown / 2026 YTD)
-python run_periods.py
-
-# Compare M15 vs M5 vs M1 side-by-side (90-day window)
-python compare_tf.py
-
-# Compare MTF require_both=True vs 4H-only gate
-python compare_mtf.py
+./venv/bin/python main.py --mode paper --symbol BTC
 ```
 
----
-
-## Running the Bot
-
-### Paper mode (live feed, no real orders)
+Live mode requires `.env` credentials and an explicit `yes` confirmation:
 
 ```bash
-python main.py --mode paper
+./venv/bin/python main.py --mode live --symbol BTC
 ```
 
-### Live mode (real trades on Hyperliquid)
+### Dashboard
 
 ```bash
-python main.py --mode live
+./venv/bin/streamlit run dashboard.py --server.port 8502
 ```
 
-Requires `.env` with `HYPERLIQUID_PRIVATE_KEY` and `HYPERLIQUID_WALLET_ADDRESS`.
+Panels: backtest result viewer (equity curve + cost attribution),
+optimizer leaderboard, live-state stub.
 
-### Live Dashboard (Streamlit)
-
-```bash
-venv/bin/streamlit run dashboard.py --server.port 8502
-```
-
-Displays live paper trade P&L, recent signals, equity curve, and position status.
-
----
-
-## Risk Management
-
-- Max position size: 10% of account per trade
-- Daily loss limit: -3% of account equity → halts trading for the rest of the day
-- Max 1 concurrent position
-
----
-
-## Key Files
+## Module map
 
 | File | Purpose |
 |------|---------|
-| `config.yaml` | All configuration — no hardcoded values |
-| `main.py` | Entry point for live/paper trading |
-| `signal_engine.py` | Kronos + TimesFM signal logic |
-| `derivatives_signal_engine.py` | Funding rate extreme + MTF gate signals |
-| `derivatives_feed.py` | Funding rate + OHLCV data for derivatives engine |
-| `derivatives_backtest.py` | Backtester for derivatives strategy |
-| `trend_signal_engine.py` | EMA crossover + D1 gate signals |
-| `atr_engine.py` | ATR-based volatility and position sizing |
-| `trend_backtest.py` | Backtester for trend strategy |
-| `backtest.py` | Core backtester (Kronos/TimesFM strategy) |
-| `kronos_model.py` | Kronos wrapper (lazy-loaded, stat fallback) |
-| `timesfm_model.py` | TimesFM wrapper (lazy-loaded, SMA fallback) |
-| `hyperliquid_feed.py` | WebSocket live feed + REST historical data |
-| `risk_manager.py` | Position sizing and daily loss kill switch |
-| `executor.py` | Hyperliquid order placement (live + paper) |
-| `dashboard.py` | Streamlit live paper trading dashboard |
-| `mtf_filter.py` | Multi-timeframe trend gate |
-| `daily_report.py` | Daily P&L summary |
-| `compare_tf.py` | Side-by-side timeframe comparison |
-| `compare_mtf.py` | MTF gate on/off comparison |
-| `run_periods.py` | Backtest across 2024 / 2025 / 2026 YTD |
-| `run_batch.sh` | Batch backtest runner |
-| `run_backtest.sh` | Quick backtest shortcut |
+| `main.py` | CLI entry point wiring the pipeline end-to-end |
+| `snipe_signal_engine.py` | Regime-gated breakout + microstructure composite |
+| `regime.py` | ADX + Hurst + realized-vol classification |
+| `microstructure.py` | Pure-math primitives: OI delta, basis, CVD, liq proximity |
+| `mtf_filter.py` | 1H/4H EMA trend bias with `.vetoes()` / `.confirms()` helpers |
+| `atr_engine.py` | ATR math + `ChandelierTrail` ratcheting exit |
+| `risk_manager.py` | Vol-targeting, Kelly overlay, kill switches |
+| `execution_policy.py` | Post-only → taker, iceberg, spread anomaly skip |
+| `executor.py` | Hyperliquid SDK wrapper (paper + live modes) |
+| `hyperliquid_feed.py` | WS candle + liquidation streams, historical REST |
+| `coinglass_client.py` | Aggregated liquidation heatmap fetcher |
+| `backtest.py` | Canonical backtester + purged walk-forward |
+| `optimizer.py` | Grid search on top of walk-forward |
+| `run_periods.py` | Multi-period side-by-side backtest comparison |
+| `dashboard.py` | Streamlit UI |
+| `alerts.py` | Discord/Slack webhook alerting |
 
----
+Legacy, retained only for the derivatives engine: `trend_signal_engine.py`,
+`trend_backtest.py`, `derivatives_*`. Removed at end of Phase 1.
 
-## Supported Assets
+## Paper → live graduation criteria
 
-Any Hyperliquid perp: SOL, BTC, ETH, AVAX, LINK, XRP, etc.
+Before any live capital, all must hold:
 
-Recommended starting point: **SOL-PERP** (deep liquidity, good volatility).
+1. ≥ 90 calendar days paper, ≥ 150 trades total (BTC + ETH combined).
+2. Paper Sharpe ≥ 1.2 (daily-resampled), max drawdown ≤ 10%.
+3. At least one trigger of every kill switch in paper — verified behavior.
+4. Live fill quality within 20% of backtest slippage assumption during
+   a two-week paper-next-to-live shadow test.
+5. Start live at 10% of target sizing for 30 days; step up only if
+   live P&L tracks paper within 25%.
 
----
+## Tests
 
-## Notes
+```bash
+./venv/bin/python -m pytest -q
+```
 
-- Backtest results ≠ live performance. Paper trade for at least a month before going live.
-- Hyperliquid taker fee: 0.035% per side. Break-even at 1:2 R:R requires ~48% win rate.
-- The statistical fallback models (no Kronos/TimesFM installed) are simpler — install the real models for meaningful results.
+Suite runs headlessly (no network), ~60s. Covers every pure-math
+module, every kill switch, every execution-policy branch, and the
+backtest + walk-forward flow on synthetic data.
+
+## Roadmap
+
+- **Phase 1 (current)** — classical breakouts + microstructure + honest
+  backtest + kill-switch-heavy risk layer. Paper-trade 90 days.
+- **Phase 2** — LightGBM classifier on crypto features (funding deltas,
+  OI, basis, CVD, liquidations, cross-asset). Integrated as a *vetoer*
+  on Phase 1 signals, not a primary predictor. Triple-barrier labels,
+  purged walk-forward CV, weekly retraining, drift monitor.
+- **Phase 3** — Portfolio of uncorrelated strategies (trend,
+  funding-squeeze, mean-reversion) across BTC/ETH/SOL/HYPE, with a
+  rolling-Sharpe meta-allocator.
