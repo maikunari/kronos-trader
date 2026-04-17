@@ -22,9 +22,7 @@ import pandas as pd
 import yaml
 
 from hyperliquid_feed import fetch_historical
-from kronos_model import KronosModel
-from timesfm_model import TimesFMModel
-from signal_engine import SignalEngine, TradeSignal
+from atr_engine import ATREngine, ATRSignal
 from risk_manager import RiskManager
 from mtf_filter import MTFFilter
 
@@ -89,7 +87,6 @@ def run_backtest(
     """Run full backtest and return results."""
     t = config["trading"]
     b = config["backtest"]
-    m = config["models"]
     r = config["risk"]
 
     symbol = symbol or t["symbol"]
@@ -107,17 +104,6 @@ def run_backtest(
     df = fetch_historical(symbol, timeframe, start_date, end_date, source=data_source)
     logger.info(f"Data: {len(df)} candles")
 
-    # Initialize models and engine
-    kronos = KronosModel(
-        model_size=m["kronos_model_size"],
-        cache_dir=m["model_cache_dir"],
-    )
-    timesfm = TimesFMModel(
-        model_name=m["timesfm_model"],
-        horizon=m["trend_horizon"],
-        cache_dir=m["model_cache_dir"],
-    )
-
     # MTF filter
     mtf_cfg = config.get("mtf", {})
     mtf = None
@@ -131,12 +117,12 @@ def run_backtest(
         )
         mtf.load_backtest_data(start_date, end_date)
 
-    engine = SignalEngine(
-        kronos=kronos,
-        timesfm=timesfm,
-        min_move_threshold=t["min_move_threshold"],
-        stop_pct=t["stop_pct"],
-        target_pct=t["target_pct"],
+    engine = ATREngine(
+        ema_fast=mtf_cfg.get("ema_fast", 20),
+        ema_slow=mtf_cfg.get("ema_slow", 50),
+        atr_period=14,
+        stop_multiplier=1.5,
+        target_multiplier=3.0,
         mtf_filter=mtf,
     )
     risk = RiskManager(
@@ -146,7 +132,7 @@ def run_backtest(
         max_concurrent_positions=r["max_concurrent_positions"],
     )
 
-    lookback = m["lookback_candles"]
+    lookback = max(mtf_cfg.get("ema_slow", 50), 14) + 10  # enough for EMA50 + ATR14
     trades: List[Trade] = []
     equity_curve = [initial_capital]
 
@@ -219,7 +205,7 @@ def run_backtest(
 
         # --- Check for new signal (only if no open trade) ---
         if open_trade is None:
-            signal: TradeSignal = engine.evaluate(candles_window, timestamp=candle["timestamp"])
+            signal: ATRSignal = engine.evaluate(candles_window, timestamp=candle["timestamp"])
             approval = risk.approve_trade(signal.action, float(candle["close"]))
 
             if approval.approved and signal.action in ("long", "short"):
