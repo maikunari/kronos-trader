@@ -9,10 +9,8 @@ websocket-client>=1.6
 # Hyperliquid
 hyperliquid-python-sdk>=0.9
 
-# Models
-timesfm>=1.0.0
-torch>=2.0
-# Kronos installed from GitHub — see README setup instructions
+# Indicators
+pandas-ta>=0.3.14b
 
 # Backtest / reporting
 matplotlib>=3.7
@@ -20,3 +18,7 @@ scipy>=1.11
 
 # Utilities
 aiohttp>=3.9
+
+# Test
+pytest>=8.0
+pytest-cov>=5.0
