@@ -1,0 +1,9 @@
+# Phase 1 extension: the first-pass sweep showed monotone improvement
+# as adx_threshold rose (25 -> 30 -> 35). Extend to see if adx=40/45/50
+# turns any combo profitable or if the trend plateaus. Other knobs
+# locked at their first-pass best (donchian=50, stop=2.5).
+#
+# 4 combos. Expect ~5 min on 9 months of 15m data.
+adx_threshold:   [35, 40, 45, 50]
+donchian_period: [50]
+stop_atr_mult:   [2.5]
