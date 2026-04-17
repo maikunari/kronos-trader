@@ -112,9 +112,9 @@ Tickers failing filters get quarantined but not deleted from the watchlist.
 
 Manual, cadence weekly. Operator reviews paid-group content and posts, proposes additions, adds to `markets/krillin_watchlist.yaml` with dated commit. Git history tracks universe evolution.
 
-### 3.4 Binance-only tickers
+### 3.4 Execution scope
 
-10 tickers on Krillin's list are not on HL (BONK, PEPE, AXL, BB, BEAM, CHZ, PDA, PORTAL, SSV, TOKEN). They are **used for signal research but not traded** — useful for validation data ("would our signal have fired on BONK?") but out of scope for live execution until/unless HL lists them.
+Hyperliquid only. Binance-only tickers from Krillin's original list are excluded from Phase 2; adding a second execution venue is a Phase 3 question that would require a multi-venue executor abstraction. Until then, the 21 HL-tradeable tickers define the universe both for signal generation and live trading.
 
 ---
 

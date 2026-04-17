@@ -1,18 +1,19 @@
-# Krillin's public TradingView watchlist (moving-average strategy)
+# Krillin's public TradingView watchlist — filtered to Hyperliquid-tradeable.
 # Source: https://www.tradingview.com/watchlists/151707692/
 # Captured: 2026-04-18
 #
-# 31 tickers total. Krillin trades a moving-average momentum strategy;
-# this list proxies for "Shiller-style mid-cap momentum universe" since
-# both traders operate in similar alt/narrative territory. Starting
-# watchlist for the AO breakout bot.
+# Original list was 31 tickers; 10 were Binance-only and are excluded
+# here (see git history of this file for the original list). Phase 2
+# trades Hyperliquid exclusively; adding a second execution venue is
+# a Phase 3 question.
 #
-# Cross-referenced against live HL perp universe (229 symbols as of
-# capture). Tickers on HL are tradeable today. Tickers not on HL can
-# still be used for signal generation via Binance if desired, with the
-# understanding that we'd only paper-trade them (or wait for HL listing).
+# 21 tickers, all live on HL perps as of capture. Cross-referenced
+# against HL's universe endpoint (229 symbols).
+#
+# Curation cadence: weekly manual review. Git history tracks
+# additions/removals and the "why" in commit messages.
 
-tradeable_on_hl:
+tickers:
   - AR         # Arweave
   - DOGE       # Dogecoin
   - DYM        # Dymension
@@ -34,18 +35,3 @@ tradeable_on_hl:
   - TNSR       # Tensor
   - TON        # Toncoin
   - W          # Wormhole
-
-binance_only:
-  # Not currently on Hyperliquid. Could be used for signal generation
-  # via Binance perp feed (strategy runs on their candles) but cannot
-  # be traded on HL — would need a Binance execution path.
-  - AXL        # Axelar
-  - BB         # BounceBit
-  - BEAM       # Beam
-  - BONK       # Bonk
-  - CHZ        # Chiliz
-  - PDA        # PlayDapp
-  - PEPE       # Pepe
-  - PORTAL     # Portal
-  - SSV        # SSV Network
-  - TOKEN      # Token (ticker ambiguous; verify before trading)
