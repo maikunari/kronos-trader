@@ -1,0 +1,51 @@
+# Krillin's public TradingView watchlist (moving-average strategy)
+# Source: https://www.tradingview.com/watchlists/151707692/
+# Captured: 2026-04-18
+#
+# 31 tickers total. Krillin trades a moving-average momentum strategy;
+# this list proxies for "Shiller-style mid-cap momentum universe" since
+# both traders operate in similar alt/narrative territory. Starting
+# watchlist for the AO breakout bot.
+#
+# Cross-referenced against live HL perp universe (229 symbols as of
+# capture). Tickers on HL are tradeable today. Tickers not on HL can
+# still be used for signal generation via Binance if desired, with the
+# understanding that we'd only paper-trade them (or wait for HL listing).
+
+tradeable_on_hl:
+  - AR         # Arweave
+  - DOGE       # Dogecoin
+  - DYM        # Dymension
+  - ENA        # Ethena
+  - ENS        # Ethereum Name Service
+  - GALA       # Gala
+  - JTO        # Jito
+  - MAV        # Maverick
+  - NEAR       # NEAR Protocol
+  - NOT        # Notcoin
+  - OMNI       # Omni Network
+  - ONDO       # Ondo Finance
+  - PENDLE     # Pendle
+  - POLYX      # Polymesh
+  - REZ        # Renzo
+  - SAGA       # Saga
+  - STRK       # Starknet
+  - TAO        # Bittensor
+  - TNSR       # Tensor
+  - TON        # Toncoin
+  - W          # Wormhole
+
+binance_only:
+  # Not currently on Hyperliquid. Could be used for signal generation
+  # via Binance perp feed (strategy runs on their candles) but cannot
+  # be traded on HL — would need a Binance execution path.
+  - AXL        # Axelar
+  - BB         # BounceBit
+  - BEAM       # Beam
+  - BONK       # Bonk
+  - CHZ        # Chiliz
+  - PDA        # PlayDapp
+  - PEPE       # Pepe
+  - PORTAL     # Portal
+  - SSV        # SSV Network
+  - TOKEN      # Token (ticker ambiguous; verify before trading)
