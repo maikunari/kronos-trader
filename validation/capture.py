@@ -15,9 +15,11 @@ Simulator conventions:
   * TP tiers are filled in price order (nearest to entry first for the
     trade direction). Each tier can fill at most its `fraction` of the
     position, or the remaining fraction if less.
-  * After all tiers fill, the remaining "runner" stays open with the
-    original stop; if it doesn't get stopped within max_hold_bars, it
-    closes at the last bar's close ('timeout' exit).
+  * **Binary outcomes only**: each trade resolves via full TP ladder fill
+    or stop hit. No timeout close. If neither has fired by the end of the
+    available candles, the trade is marked "unresolved" and contributes
+    zero realized PnL — it's flagged so the report can count them
+    separately, but not folded into capture stats.
   * No trailing stop migration in v1 — the simulator tracks the same
     initial stop throughout. Chandelier / leg-based trails are position-
     manager logic (Phase D); validation here measures the bare-bones
@@ -84,10 +86,20 @@ def simulate_capture(
     pop: PopEvent,
     candles: pd.DataFrame,
     *,
-    max_hold_bars: int = 72,
+    max_hold_bars: Optional[int] = None,
 ) -> Optional[CaptureResult]:
     """
     Simulate the trade from `trigger` forward over `candles`.
+
+    Binary outcomes: the trade resolves via stop hit or full TP ladder
+    fill. If neither happens by the end of the simulation window, the
+    result has exit_reason='unresolved' and zero realized PnL — not
+    counted in capture stats.
+
+    Args:
+        max_hold_bars: hard cap on bars to simulate. Default None = no cap
+                       (run to end of candles). Pass a number only to
+                       bound worst-case simulation time.
 
     Returns None if the trigger's bar can't be located in `candles`.
     """
@@ -102,7 +114,6 @@ def simulate_capture(
     direction = trigger.direction
     entry = trigger.entry_price
     stop = trigger.stop_price
-    # Sort tiers nearest-to-entry first for the trade direction
     if direction == "long":
         tiers = sorted(trigger.tp_ladder, key=lambda tp: tp.price)
     else:
@@ -110,16 +121,19 @@ def simulate_capture(
     tiers_remaining = list(tiers)
 
     remaining = 1.0
-    realized = 0.0   # weighted signed return
+    realized = 0.0
     fills: list[TierFill] = []
-    exit_reason = "end_of_data"
+    exit_reason = "unresolved"
     last_bar_seen = entry_idx
 
     highs = candles["high"].to_numpy(dtype=float)
     lows = candles["low"].to_numpy(dtype=float)
-    closes = candles["close"].to_numpy(dtype=float)
 
-    for i in range(entry_idx + 1, min(entry_idx + 1 + max_hold_bars, len(candles))):
+    end_idx = len(candles) if max_hold_bars is None else min(
+        entry_idx + 1 + max_hold_bars, len(candles)
+    )
+
+    for i in range(entry_idx + 1, end_idx):
         last_bar_seen = i
         high = highs[i]
         low = lows[i]
@@ -160,27 +174,15 @@ def simulate_capture(
                 remaining -= frac
                 tiers_remaining.pop(0)
             else:
-                break   # price didn't reach next tier
+                break
 
         if remaining <= 1e-9:
             exit_reason = "target"
             break
-    else:
-        # Loop completed without break — timeout
-        last_bar_seen = min(entry_idx + max_hold_bars, len(candles) - 1)
 
-    # Close any residual at last close
-    if remaining > 1e-9:
-        last_close = closes[last_bar_seen]
-        if direction == "long":
-            pnl = (last_close - entry) / entry * remaining
-        else:
-            pnl = (entry - last_close) / entry * remaining
-        realized += pnl
-        fills.append(TierFill(exit_reason if exit_reason != "end_of_data" else "timeout",
-                              last_close, remaining, last_bar_seen))
-        exit_reason = fills[-1].level
-
+    # If neither stop nor full TP ladder resolved by end of data: unresolved.
+    # Do NOT force-close at last bar — trade is still open.
+    # Realized PnL is whatever partial TPs hit (if any); remaining contributes 0.
     total_fraction = sum(f.fraction for f in fills)
     if total_fraction > 0:
         weighted_exit = sum(f.price * f.fraction for f in fills) / total_fraction

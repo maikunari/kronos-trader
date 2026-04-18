@@ -129,14 +129,32 @@ def test_long_trade_partial_ladder_then_stop():
 # Timeout
 # ---------------------------------------------------------------------------
 
-def test_trade_times_out_with_residual_position():
-    # Price drifts sideways, never hits stop or TPs
+def test_unresolved_trade_when_no_stop_or_tp_hit():
+    """Binary-outcome rule: if neither stop nor full TP fires, the
+    trade is unresolved — no forced close at last bar."""
     highs = np.array([100.0] + [101.0] * 15)
     lows = np.array([100.0] + [99.0] * 15)
     result = simulate_capture(_trigger(), _pop(), _candles(highs, lows), max_hold_bars=10)
-    assert result.exit_reason == "timeout"
-    # No fills at TP or stop — just timeout close
-    assert any(f.level == "timeout" for f in result.tier_fills)
+    assert result.exit_reason == "unresolved"
+    # No fills at all — position still open
+    assert result.realized_return_pct == 0.0
+    # No synthetic "timeout" fill either
+    assert all(f.level in {"target", "stop"} for f in result.tier_fills)
+
+
+def test_unresolved_trade_with_partial_tp_fills_keeps_those_pnls():
+    """If TP1 hits but neither stop nor final TP resolves, partial PnL
+    from TP fills is kept; remaining position contributes zero."""
+    # Hit first TP at 110 (+10%, fills 0.5), then drift sideways forever
+    highs = np.array([100.0, 112.0] + [108.0] * 15)
+    lows = np.array([100.0, 100.0] + [105.0] * 15)
+    result = simulate_capture(_trigger(), _pop(), _candles(highs, lows), max_hold_bars=10)
+    assert result.exit_reason == "unresolved"
+    # TP1 partial captured
+    assert result.realized_return_pct == pytest.approx(0.05)   # 0.5 * 10% = 5%
+    # Exactly one fill (the TP1); remaining 0.5 still "open"
+    assert len(result.tier_fills) == 1
+    assert result.tier_fills[0].level == "target"
 
 
 # ---------------------------------------------------------------------------

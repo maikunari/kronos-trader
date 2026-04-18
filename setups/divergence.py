@@ -248,6 +248,7 @@ class DivergenceReversalDetector:
         triple_confidence_boost: float = 1.5,
         base_confidence: float = 0.55,
         atr_period: int = 14,
+        min_target_distance_pct: float = 0.10,
     ) -> None:
         self.pivot_window = pivot_window
         self.bb_period = bb_period
@@ -257,6 +258,10 @@ class DivergenceReversalDetector:
         self.triple_confidence_boost = triple_confidence_boost
         self.base_confidence = base_confidence
         self.atr_period = atr_period
+        # Per CBS "look left for TP": only fire if there's at least one
+        # structural target this far from entry. Rejects setups with no
+        # meaningful runway.
+        self.min_target_distance_pct = min_target_distance_pct
 
     def detect(self, ctx: MarketContext) -> Optional[Trigger]:
         if ctx.ao is None or ctx.rsi is None:
@@ -296,7 +301,10 @@ class DivergenceReversalDetector:
             if not two_bar_same_color(ctx.ao, needed_color):
                 continue
 
-            return self._build_trigger(ctx, finding, direction)  # type: ignore[arg-type]
+            trig = self._build_trigger(ctx, finding, direction)  # type: ignore[arg-type]
+            if trig is not None:
+                return trig
+            # else: target-distance filter rejected; try the other direction
 
         return None
 
@@ -307,7 +315,7 @@ class DivergenceReversalDetector:
         ctx: MarketContext,
         finding: DivergenceFinding,
         direction: Direction,
-    ) -> Trigger:
+    ) -> Optional[Trigger]:
         entry = ctx.current_price
 
         # Stop placement: just beyond the divergent pivot
@@ -322,6 +330,18 @@ class DivergenceReversalDetector:
             entry=entry, direction=direction,
             sr_zones=ctx.sr_zones, atr=atr,
         )
+
+        # "Look left" filter: reject setups with no meaningful target runway.
+        # Require at least one TP to be `min_target_distance_pct` away from
+        # entry in the trade direction. Prevents grabbing near-field noise
+        # zones as TPs when there's no real structural target far above/below.
+        if tp_ladder:
+            max_distance = max(abs(tp.price - entry) / entry for tp in tp_ladder)
+            if max_distance < self.min_target_distance_pct:
+                return None
+        else:
+            # No ladder at all (no zones AND no ATR) — not tradeable
+            return None
 
         # Confidence: base × (double-div bonus) × (triple bonus)
         confidence = self.base_confidence
