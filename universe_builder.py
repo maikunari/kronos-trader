@@ -334,7 +334,7 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
     parser = argparse.ArgumentParser(description="Build HL-tradeable universe from filters.")
     parser.add_argument("--mc-min", type=float, default=100e6, help="Min market cap USD (default 100M)")
-    parser.add_argument("--mc-max", type=float, default=10e9, help="Max market cap USD (default 10B)")
+    parser.add_argument("--mc-max", type=float, default=30e9, help="Max market cap USD (default 30B)")
     parser.add_argument("--vol-min", type=float, default=1e6, help="Min 30d avg daily vol USD (default 1M)")
     parser.add_argument("--oi-min", type=float, default=1e6, help="Min OI USD (default 1M)")
     parser.add_argument("--allow-missing-mc", action="store_true",

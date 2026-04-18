@@ -1,0 +1,85 @@
+# CBS (ColdBloodedShiller) documented trade log.
+#
+# Seed corpus for replication-fidelity validation (architecture doc §9.6).
+# Populated from screenshots and X posts the operator shares. Grows
+# incrementally — do not regenerate, only append.
+#
+# Each trade captures:
+#   ticker / exchange / timeframe      — what the chart showed
+#   direction (long|short)
+#   entry_date + optional entry_time   — best available; UTC preferred
+#   entry_price                         — exact if posted, else approx
+#   stop_initial                        — original invalidation
+#   stop_current (optional)             — if operator saw stop ratcheted
+#   targets: list of price levels (Shiller posts multi-tier TPs)
+#   status: open | hit_targets | stopped | partial
+#   setup_type: operator's best guess at which of our 6 setups this matches
+#   source: where we got this (screenshot date, tweet, group post)
+#   notes: free-form context (including runner behavior, partial TPs)
+#
+# The replication matcher (next session: validation/cbs_replication.py)
+# iterates these, pulls HL candles for entry_date ± window, and asks:
+# would our bot have fired a matching-direction trigger near entry_date?
+
+trades:
+  - id: hype_long_2026_04_05
+    ticker: HYPE
+    exchange: Hyperliquid  # also KuCoin in some charts
+    timeframe: 1h
+    direction: long
+    entry_date: 2026-04-05
+    entry_price_approx: 36.0   # between 35.69 support and 36.11
+    stop_initial: 35.69        # below the pink support zone (wick-based)
+    stop_current: 41.18        # moved up to bottom of most recent leg
+    targets:
+      - 40.25   # first TP, hit ~Apr 9 (confirmed "50% TP'd" Apr 10)
+      - 45.53   # second target zone (upper green box)
+      - 70.00   # long-horizon ATH target per Apr 12 tweet
+    status: open
+    setup_type: consolidation_break_then_trend   # matches architecture §4.3 (diagonal breakout) and §4.5 (consolidation-under-resistance)
+    source: CBS TradingView screenshots shared 2026-04-18 (chart dated Apr 9 + Apr 13)
+    notes: >
+      Entry off support zone at 35.69-36.11 after range consolidation.
+      Classic CBS pyramiding visible: initial stop at range low 35.69,
+      ratcheted to 41.18 as leg developed (stop = bottom of current leg).
+      Tweets:
+        Apr 10: "Taking advantage of counter-trend rallies... I'm 50% TP'd
+                 because I'm posting on Twitter"
+        Apr 12: "Weekly chart is a thing of beauty, up to $70 soon"
+        Apr 14: "No real reason to trade anything other than $HYPE"
+      Still holding as of Apr 14+.
+
+  - id: spx_long_2026_04_05
+    ticker: SPX          # S&P 500 — NOT on HL, but useful for replication
+    exchange: OANDA      # also BlackBull for the Apr 7 H4 chart
+    timeframe: 1h
+    direction: long
+    entry_date: 2026-04-05
+    entry_price_approx: 6580   # above the 6,548 stop zone top
+    stop_initial: 6524         # bottom of the pink stop zone (wick-based)
+    targets:
+      - 6833   # hit Apr 9 per Apr 9 screenshot
+      - 6955   # hit Apr 15 per earlier screenshot (original full-target run)
+    status: hit_targets
+    setup_type: v_reversal_then_consolidation_break  # matches architecture §4.4 (V-reversal at extended move) + §4.3 (diagonal breakout)
+    source: CBS TradingView screenshots shared 2026-04-18 (charts dated Apr 7, Apr 9)
+    notes: >
+      Entry at 6,548-6,600 after S&P's ~10% drawdown bottomed at 6,320
+      (late March). Apr 7 H4 chart showed local resistance at 6,640
+      being challenged. Apr 8 tweet: "Local resistance here, but if it
+      breaks it will represent the first time a former high has been
+      challenged. This should start some form of upside impulse."
+      Trade held through the Apr 8-11 consolidation into the breakout
+      run to 6,955. Wicked into stop zone but didn't break through
+      (illustrates wick-based stop placement rule perfectly).
+
+# ---------------------------------------------------------------------------
+# Need more trades to make the replication check statistically useful.
+# Priorities (high -> low information value):
+#   1. CLOSED trades with outcomes (winners or losers)
+#   2. Trades on tickers in our core universe (ENA, TAO, JTO, NEAR, LINK,
+#      AVAX, PENDLE) — so we can replay our detector on the same candles
+#   3. Older trades (Jan/Feb/Mar 2026) — so we have fully resolved outcomes
+#   4. Losing trades — tell us his invalidation discipline
+#   5. Short trades — we have only longs so far
+# ---------------------------------------------------------------------------
