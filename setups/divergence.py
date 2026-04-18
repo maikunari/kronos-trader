@@ -318,12 +318,20 @@ class DivergenceReversalDetector:
     ) -> Optional[Trigger]:
         entry = ctx.current_price
 
-        # Stop placement: just beyond the divergent pivot
-        buffer = 0.003   # 30 bps buffer
+        # Stop placement uses the WICK of the divergent pivot bar, not its
+        # close. Pivots are detected on the close series (per CBS "draw
+        # levels at closes"), but the stop needs to sit below the actual
+        # price the bar reached, otherwise normal retests wick us out.
+        # The recent_pivot.index points to the pivot bar; we look up its
+        # actual low/high and place the stop beyond it with a small buffer.
+        pivot_idx = finding.recent_pivot.index
+        buffer = 0.003   # 30 bps buffer below/above the wick
         if direction == "long":
-            stop = finding.recent_pivot.value * (1 - buffer)
+            pivot_wick = float(ctx.candles["low"].iloc[pivot_idx])
+            stop = pivot_wick * (1 - buffer)
         else:
-            stop = finding.recent_pivot.value * (1 + buffer)
+            pivot_wick = float(ctx.candles["high"].iloc[pivot_idx])
+            stop = pivot_wick * (1 + buffer)
 
         atr = self._atr(ctx.candles)
         tp_ladder = build_tp_ladder(
@@ -366,7 +374,8 @@ class DivergenceReversalDetector:
                 "rsi_diverged": finding.rsi_diverged,
                 "triple": finding.is_triple,
                 "bars_since_pivot": ctx.current_bar_index - finding.recent_pivot.index,
-                "divergent_price": finding.recent_pivot.value,
+                "divergent_price_close": finding.recent_pivot.value,
+                "divergent_wick": pivot_wick,
                 "prior_price": finding.prior_pivot.value,
             },
         )

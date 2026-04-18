@@ -318,6 +318,29 @@ def test_detector_returns_none_on_insufficient_data():
     assert detector.detect(ctx) is None
 
 
+def test_detector_places_stop_below_pivot_wick_not_close():
+    """Per wick-based stop-placement rule: a long trade's stop should be
+    below the pivot bar's LOW (actual wick), not below its close. Otherwise
+    normal retests wick out the trade."""
+    df = _build_bullish_divergence_candles()
+    # Ensure the divergent pivot bar has a clear wick below its close
+    # by checking: any trigger's stop must be below the low of the pivot bar.
+    ctx = MarketContext.build(ticker="TEST", timeframe="1h", candles=df)
+    det = DivergenceReversalDetector(pivot_window=5, bb_period=20, max_bars_since_pivot=60,
+                                      min_target_distance_pct=0.001)
+    trig = det.detect(ctx)
+    if trig is not None:
+        # The divergent pivot's bar index is stored in components via the test
+        # fixture's detection; confirm stop is below that bar's LOW
+        pivot_close = trig.components.get("divergent_price_close")
+        wick = trig.components.get("divergent_wick")
+        assert wick is not None
+        # For longs, wick low <= pivot close (wick below body)
+        assert wick <= pivot_close
+        # Stop sits below the wick (plus buffer)
+        assert trig.stop_price < wick
+
+
 def test_detector_rejects_setup_with_no_meaningful_target_distance():
     """CBS's 'look left' rule: if no TP is at least 10% away, skip the setup."""
     df = _build_bullish_divergence_candles()

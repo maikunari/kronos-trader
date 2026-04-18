@@ -43,7 +43,9 @@ def main() -> int:
     parser.add_argument("--window-hours", type=float, default=72.0)
     parser.add_argument("--out", default="tasks/phase_b_validation.md")
     parser.add_argument("--tickers", nargs="*",
-                        help="Override ticker list (default: full watchlist)")
+                        help="Override ticker list (default: from --universe-file)")
+    parser.add_argument("--universe-file", default="markets/core_universe.yaml",
+                        help="YAML file with tickers: field (default: markets/core_universe.yaml)")
     parser.add_argument("--max-lead-hours", type=float, default=24.0)
     parser.add_argument("--max-lag-hours", type=float, default=4.0)
     args = parser.parse_args()
@@ -51,7 +53,7 @@ def main() -> int:
     if args.tickers:
         tickers = args.tickers
     else:
-        wl = yaml.safe_load(Path("markets/krillin_watchlist.yaml").read_text())
+        wl = yaml.safe_load(Path(args.universe_file).read_text())
         tickers = wl["tickers"]
 
     print(f"Running Phase B validation on {len(tickers)} tickers, {args.timeframe}, "

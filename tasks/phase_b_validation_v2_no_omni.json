@@ -1,0 +1,95 @@
+{
+  "stats": [
+    {
+      "setup": "divergence_reversal",
+      "direction": "long",
+      "pops": 20,
+      "triggers": 4,
+      "true_positives": 1,
+      "false_negatives": 19,
+      "false_positives": 3,
+      "recall": 0.05,
+      "precision": 0.25,
+      "median_capture_ratio": 0.3741859617824518,
+      "mean_realized_return": 0.0786978411685315,
+      "median_lead_hours": -3.0,
+      "exit_reasons": {
+        "target": 1
+      }
+    },
+    {
+      "setup": "divergence_reversal",
+      "direction": "short",
+      "pops": 4,
+      "triggers": 3,
+      "true_positives": 0,
+      "false_negatives": 4,
+      "false_positives": 3,
+      "recall": 0.0,
+      "precision": 0.0,
+      "median_capture_ratio": 0.0,
+      "mean_realized_return": 0.0,
+      "median_lead_hours": null,
+      "exit_reasons": {}
+    }
+  ],
+  "per_ticker_pops": {
+    "AR": 3,
+    "DOGE": 0,
+    "DYM": 0,
+    "ENA": 2,
+    "ENS": 0,
+    "GALA": 1,
+    "JTO": 3,
+    "MAV": 2,
+    "NEAR": 2,
+    "NOT": 0,
+    "ONDO": 0,
+    "PENDLE": 0,
+    "POLYX": 2,
+    "REZ": 3,
+    "SAGA": 1,
+    "STRK": 0,
+    "TAO": 5,
+    "TNSR": 0,
+    "TON": 0,
+    "W": 0
+  },
+  "total_pops": 24,
+  "total_triggers": 7,
+  "config": {
+    "timeframe": "1h",
+    "threshold_pct": 0.2,
+    "window_hours": 72.0,
+    "max_hold_bars": 72,
+    "max_lead_hours": 24.0,
+    "max_lag_hours": 4.0,
+    "tickers": [
+      "AR",
+      "DOGE",
+      "DYM",
+      "ENA",
+      "ENS",
+      "GALA",
+      "JTO",
+      "MAV",
+      "NEAR",
+      "NOT",
+      "ONDO",
+      "PENDLE",
+      "POLYX",
+      "REZ",
+      "SAGA",
+      "STRK",
+      "TAO",
+      "TNSR",
+      "TON",
+      "W"
+    ],
+    "detectors": [
+      "divergence_reversal"
+    ],
+    "start": "2025-04-01 00:00:00+00:00",
+    "end": "2026-04-01 00:00:00+00:00"
+  }
+}

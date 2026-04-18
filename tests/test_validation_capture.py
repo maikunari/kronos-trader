@@ -61,6 +61,46 @@ def _candles(highs: np.ndarray, lows: np.ndarray, start="2025-01-01 00:00"):
 
 
 # ---------------------------------------------------------------------------
+# Wick-based stop behavior (real exchange mechanics)
+# ---------------------------------------------------------------------------
+
+def _candles_with_close(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray,
+                        start="2025-01-01 00:00"):
+    """OHLCV with explicit closes, for tests that care about close vs wick."""
+    n = len(highs)
+    ts = pd.date_range(start, periods=n, freq="1h", tz="UTC")
+    return pd.DataFrame({
+        "timestamp": ts, "open": closes, "high": highs, "low": lows,
+        "close": closes, "volume": [1000.0] * n,
+    })
+
+
+def test_wick_below_stop_exits_long_even_if_close_above():
+    """Real-exchange behavior: a stop order fires on any intrabar touch.
+    A wick below the stop triggers exit regardless of where the bar closes."""
+    # Entry 100, stop 95. Bar 1 wicks to 94 (below stop) but closes at 98.
+    # Stop should still fire.
+    highs = np.array([100.0, 99.0])
+    lows  = np.array([100.0, 94.0])
+    closes = np.array([100.0, 98.0])
+    df = _candles_with_close(highs, lows, closes)
+    result = simulate_capture(_trigger(), _pop(), df)
+    assert result.exit_reason == "stop"
+
+
+def test_wick_above_stop_exits_short_even_if_close_below():
+    trigger = _trigger(entry=100, stop=105, targets=((90.0, 0.5), (80.0, 0.5)), direction="short")
+    pop = _pop(direction="short")
+    # Bar 1 wicks to 106 (above stop) but closes at 102
+    highs = np.array([100.0, 106.0])
+    lows  = np.array([100.0, 99.0])
+    closes = np.array([100.0, 102.0])
+    df = _candles_with_close(highs, lows, closes)
+    result = simulate_capture(trigger, pop, df)
+    assert result.exit_reason == "stop"
+
+
+# ---------------------------------------------------------------------------
 # Stop-out scenarios
 # ---------------------------------------------------------------------------
 

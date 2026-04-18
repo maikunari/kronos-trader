@@ -10,6 +10,14 @@ trigger's stop, its TP ladder, and partial fills along the way.
 Simulator conventions:
   * Entry is at trigger.entry_price at the trigger's bar (no latency modeled).
   * Each subsequent bar's [low, high] range is scanned.
+  * Both stops and TPs are WICK-based (intrabar touch = fill). This
+    matches how real exchange orders work: stop orders fire the moment
+    price touches the trigger level, not at bar close. Likewise resting
+    TP limits fill on any touch.
+  * Stop PLACEMENT is the setup's responsibility — each detector places
+    the stop at a level that tolerates normal wick noise (e.g., below
+    the swing-low's wick rather than the swing-low's close). The
+    simulator just enforces the mechanic of wick-fills.
   * Stop check runs first on each bar (conservative — if both stop and
     a TP lie within the same bar's range, assume stop filled first).
   * TP tiers are filled in price order (nearest to entry first for the
@@ -138,7 +146,9 @@ def simulate_capture(
         high = highs[i]
         low = lows[i]
 
-        # Stop check first (conservative)
+        # Stops fire on intrabar wick touch (real exchange behavior).
+        # Stop placement is the setup's responsibility — see
+        # setups/divergence.py for the wick-based placement rule.
         if direction == "long" and low <= stop:
             frac = remaining
             pnl = (stop - entry) / entry * frac
