@@ -24,7 +24,6 @@ tickers:
   - MAV        # Maverick
   - NEAR       # NEAR Protocol
   - NOT        # Notcoin
-  - OMNI       # Omni Network
   - ONDO       # Ondo Finance
   - PENDLE     # Pendle
   - POLYX      # Polymesh
@@ -35,3 +34,11 @@ tickers:
   - TNSR       # Tensor
   - TON        # Toncoin
   - W          # Wormhole
+
+# Dropped:
+#   OMNI (2026-04-18): thin-volume recent HL listing that produced
+#   21 of 45 labeled pops in Phase B validation — an order of magnitude
+#   denser than any other ticker. Likely a data artifact of low liquidity
+#   + recent listing dynamics rather than tradeable signal. Removing OMNI
+#   shifted validation precision from 9.1% to 25.0%, confirming it was
+#   distorting the aggregate.
