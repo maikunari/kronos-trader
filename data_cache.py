@@ -112,12 +112,22 @@ def clear_cache(
 # ---------------------------------------------------------------------------
 
 def default_fetcher(symbol: str, timeframe: str, start_ms: int, end_ms: int) -> pd.DataFrame:
-    """Try Hyperliquid first, fall back to Binance if HL returns empty."""
+    """Try Hyperliquid first, fall back to Binance if HL returns empty.
+
+    Binance fallback is best-effort — some HL-listed tickers (mid-caps,
+    HL-exclusive listings) aren't on Binance at all. In that case we
+    return HL's empty result rather than raising, so callers can degrade
+    to "no data" instead of crashing.
+    """
     df = fetch_historical_hl(symbol, timeframe, start_ms, end_ms)
-    if df.empty:
-        logger.info("HL empty for %s %s — trying Binance", symbol, timeframe)
-        df = fetch_historical_binance(symbol, timeframe, start_ms, end_ms)
-    return df
+    if not df.empty:
+        return df
+    logger.info("HL empty for %s %s — trying Binance", symbol, timeframe)
+    try:
+        return fetch_historical_binance(symbol, timeframe, start_ms, end_ms)
+    except ValueError as exc:
+        logger.info("Binance fallback unavailable for %s: %s", symbol, exc)
+        return pd.DataFrame(columns=OHLCV_COLS)
 
 
 # ---------------------------------------------------------------------------
