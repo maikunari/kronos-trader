@@ -178,3 +178,52 @@ class SetupDetector(Protocol):
 
     def detect(self, ctx: MarketContext) -> Optional[Trigger]:  # pragma: no cover
         ...
+
+
+# ---------------------------------------------------------------------------
+# TP ladder builder (shared across all setups)
+# ---------------------------------------------------------------------------
+
+def build_tp_ladder(
+    entry: float,
+    direction: Direction,
+    sr_zones: Optional[list[SRZone]],
+    atr: float,
+    max_targets: int = 3,
+    fractions: tuple[float, ...] = (0.33, 0.33, 0.34),
+    atr_multipliers: tuple[float, ...] = (1.5, 3.0, 5.0),
+) -> tuple[TPLevel, ...]:
+    """
+    Build a take-profit ladder from S/R zones in the trade direction.
+
+    If fewer than `max_targets` zones exist within a reasonable range,
+    the remaining slots are filled with ATR-based targets at the specified
+    multipliers.
+    """
+    sr_targets: list[TPLevel] = []
+    if sr_zones:
+        targets_direction = "up" if direction == "long" else "down"
+        candidates = []
+        for z in sr_zones:
+            dist = z.distance_pct(entry)
+            if targets_direction == "up" and dist > 0:
+                candidates.append((dist, z))
+            elif targets_direction == "down" and dist < 0:
+                candidates.append((abs(dist), z))
+        candidates.sort()
+        for i, (_, z) in enumerate(candidates[:max_targets]):
+            frac = fractions[i] if i < len(fractions) else 0.1
+            sr_targets.append(TPLevel(price=z.price_mid, fraction=frac, source="sr_zone"))
+
+    if len(sr_targets) >= max_targets or atr <= 0:
+        return tuple(sr_targets)
+
+    # Fill remaining slots with ATR-based targets
+    filled = list(sr_targets)
+    for i in range(len(filled), max_targets):
+        mult = atr_multipliers[i] if i < len(atr_multipliers) else 3.0 + (i - 2) * 2
+        delta = mult * atr
+        price = entry + delta if direction == "long" else entry - delta
+        frac = fractions[i] if i < len(fractions) else 0.1
+        filled.append(TPLevel(price=price, fraction=frac, source="atr_fallback"))
+    return tuple(filled)

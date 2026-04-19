@@ -5,12 +5,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from setups.base import MarketContext, SetupDetector, TPLevel, Trigger
+from setups.base import MarketContext, SetupDetector, TPLevel, Trigger, build_tp_ladder
 from setups.divergence import (
     DivergenceReversalDetector,
     _detect_divergence,
     _is_at_extreme,
-    build_tp_ladder,
 )
 from support_resistance import SRZone, TouchEvent
 
