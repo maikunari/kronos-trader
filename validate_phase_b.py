@@ -27,6 +27,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from setups.consolidation_breakout import ConsolidationBreakoutDetector
 from setups.divergence import DivergenceReversalDetector
 from validation.report import run_validation
 
@@ -60,7 +61,7 @@ def main() -> int:
           f"{args.start} -> {args.end}", file=sys.stderr)
 
     report = run_validation(
-        detectors=[DivergenceReversalDetector()],
+        detectors=[DivergenceReversalDetector(), ConsolidationBreakoutDetector()],
         tickers=tickers,
         timeframe=args.timeframe,
         start=args.start,

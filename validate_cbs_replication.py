@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from setups.consolidation_breakout import ConsolidationBreakoutDetector
 from setups.divergence import DivergenceReversalDetector
 from validation.cbs_replication import (
     load_cbs_trades,
@@ -41,7 +42,10 @@ def main() -> int:
     trades = load_cbs_trades(args.trades_file)
     print(f"Loaded {len(trades)} CBS trades from {args.trades_file}", file=sys.stderr)
 
-    detectors = [DivergenceReversalDetector()]
+    detectors = [
+        DivergenceReversalDetector(),
+        ConsolidationBreakoutDetector(),
+    ]
     report = run_replication(
         trades, detectors,
         match_window=pd.Timedelta(hours=args.match_window_hours),

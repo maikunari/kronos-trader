@@ -1,0 +1,43 @@
+{
+  "results": [
+    {
+      "trade_id": "hype_long_2026_04_05",
+      "ticker": "HYPE",
+      "direction": "long",
+      "entry_date": "2026-04-05 00:00:00+00:00",
+      "matched": false,
+      "best_trigger": null,
+      "same_direction_trigger_count": 0,
+      "opposite_direction_trigger_count": 0,
+      "gap_reason": "no_trigger_in_window",
+      "fetch_error": null,
+      "lead_time_hours": null,
+      "bars_scanned": 1129
+    },
+    {
+      "trade_id": "spx_long_2026_04_05",
+      "ticker": "SPX",
+      "direction": "long",
+      "entry_date": "2026-04-05 00:00:00+00:00",
+      "matched": false,
+      "best_trigger": null,
+      "same_direction_trigger_count": 0,
+      "opposite_direction_trigger_count": 0,
+      "gap_reason": "no_trigger_in_window",
+      "fetch_error": null,
+      "lead_time_hours": null,
+      "bars_scanned": 1129
+    }
+  ],
+  "config": {
+    "detectors": [
+      "divergence_reversal",
+      "consolidation_breakout"
+    ],
+    "match_window_hours": 24.0,
+    "lookback_days": 45,
+    "post_days": 2,
+    "total_trades": 2
+  },
+  "match_rate": 0.0
+}
