@@ -222,7 +222,7 @@ def test_replicate_trade_records_fetch_error(monkeypatch):
     def failing_fetcher(*a, **kw):
         raise RuntimeError("unfetchable exchange")
 
-    trade = _trade_for("2026-03-25", direction="long", ticker="SPX")
+    trade = _trade_for("2026-03-25", direction="long", ticker="FAKESPX")
     result = replicate_trade(
         trade, [],
         lookback_days=20, post_days=2,
@@ -242,15 +242,15 @@ def test_run_replication_computes_match_rate_and_skips_fetch_errors():
     entry_date = pd.Timestamp("2026-03-25", tz="UTC")
     fire_at = entry_date - pd.Timedelta(hours=3)
 
-    # Trade A: ticker HYPE, fetched OK, detector fires → match
+    # Trade A: fake ticker (avoids any real cache), detector fires → match
     detector = _FixedTriggerDetector(fire_at=fire_at, direction="long")
-    trade_ok = _trade_for(entry_date, direction="long", ticker="HYPE")
+    trade_ok = _trade_for(entry_date, direction="long", ticker="FAKEOK")
 
-    # Trade B: ticker SPX, fetcher errors → skipped from assessed
-    trade_err = _trade_for(entry_date, direction="long", ticker="SPX")
+    # Trade B: fake ticker, fetcher errors → skipped from assessed
+    trade_err = _trade_for(entry_date, direction="long", ticker="FAKESPX")
 
     def mixed_fetcher(symbol, timeframe, start_ms, end_ms):
-        if symbol == "SPX":
+        if symbol == "FAKESPX":
             raise RuntimeError("no feed")
         ts_ms = df["timestamp"].apply(lambda t: int(t.timestamp() * 1000))
         mask = (ts_ms >= start_ms) & (ts_ms <= end_ms)
