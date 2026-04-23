@@ -29,6 +29,7 @@ import yaml
 
 from setups.consolidation_breakout import ConsolidationBreakoutDetector
 from setups.divergence import DivergenceReversalDetector
+from setups.v_reversal import VReversalDetector
 from validation.report import run_validation
 
 
@@ -61,7 +62,11 @@ def main() -> int:
           f"{args.start} -> {args.end}", file=sys.stderr)
 
     report = run_validation(
-        detectors=[DivergenceReversalDetector(), ConsolidationBreakoutDetector()],
+        detectors=[
+            DivergenceReversalDetector(),
+            ConsolidationBreakoutDetector(),
+            VReversalDetector(),
+        ],
         tickers=tickers,
         timeframe=args.timeframe,
         start=args.start,

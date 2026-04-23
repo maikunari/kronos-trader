@@ -22,6 +22,7 @@ import pandas as pd
 
 from setups.consolidation_breakout import ConsolidationBreakoutDetector
 from setups.divergence import DivergenceReversalDetector
+from setups.v_reversal import VReversalDetector
 from validation.cbs_replication import (
     load_cbs_trades,
     run_replication,
@@ -45,6 +46,7 @@ def main() -> int:
     detectors = [
         DivergenceReversalDetector(),
         ConsolidationBreakoutDetector(),
+        VReversalDetector(),
     ]
     report = run_replication(
         trades, detectors,
