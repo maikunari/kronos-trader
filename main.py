@@ -7,6 +7,7 @@ Modes:
   --mode paper      Live feed, signals logged but no real orders
   --mode live       Live trading on Hyperliquid (requires .env credentials)
   --mode agent      LLM strategy-generation loop (see strategy_agent.py)
+  --mode setup-agent  LLM setup-detector generation loop (see setup_agent.py)
 
 Backtest is the primary daily-driver until paper-trading graduation. The
 live loop is intentionally small: build MarketContext each bar close,
@@ -349,7 +350,7 @@ def _pnl(direction: str, entry: float, exit_p: float, size_usd: float) -> float:
 # ------------------------------------------------------------------
 
 def cmd_agent(args, config: dict) -> int:
-    """Dispatch to strategy_agent.run_agent_loop.
+    """Dispatch to strategy_agent.run_agent_loop (trend-engine agent).
 
     Lazy-imports strategy_agent so sniper modes don't load anthropic.
     Enforces the ANTHROPIC_API_KEY requirement unless --dry-run.
@@ -366,6 +367,24 @@ def cmd_agent(args, config: dict) -> int:
     return 0
 
 
+def cmd_setup_agent(args) -> int:
+    """Dispatch to setup_agent.run_agent_loop (Phase C setup-detector agent).
+
+    Lazy-imports setup_agent so sniper modes don't load anthropic.
+    The config isn't used — the setup agent pins its own probe config.
+    """
+    if not args.dry_run and not os.getenv("ANTHROPIC_API_KEY"):
+        print(
+            "ERROR: ANTHROPIC_API_KEY is not set. Use --dry-run to test "
+            "without an API key.",
+            file=sys.stderr,
+        )
+        return 1
+    from setup_agent import run_agent_loop as run_setup_agent_loop
+    run_setup_agent_loop(args)
+    return 0
+
+
 # ------------------------------------------------------------------
 # CLI
 # ------------------------------------------------------------------
@@ -374,7 +393,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Kronos-trader Phase 1 sniper")
     parser.add_argument(
         "--mode",
-        choices=["backtest", "paper", "live", "agent"],
+        choices=["backtest", "paper", "live", "agent", "setup-agent"],
         default="backtest",
     )
     parser.add_argument("--config", default="config.yaml")
@@ -410,6 +429,8 @@ def main() -> int:
         return cmd_backtest(args, config)
     if args.mode == "agent":
         return cmd_agent(args, config)
+    if args.mode == "setup-agent":
+        return cmd_setup_agent(args)
     if args.mode == "live":
         confirm = input("WARNING: LIVE trading — real funds at risk. Type 'yes' to continue: ")
         if confirm.strip().lower() != "yes":

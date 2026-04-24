@@ -7,3 +7,4 @@ model_cache/
 cache/
 strategies/generated/candle_cache/
 strategies/generated/runs/
+setups/generated/runs/
