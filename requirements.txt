@@ -18,6 +18,10 @@ scipy>=1.11
 
 # Utilities
 aiohttp>=3.9
+pyarrow>=14.0     # parquet support for candle caching in strategy_agent
+
+# LLM strategy agent
+anthropic>=0.40
 
 # Dashboard (optional; not required for headless backtests or live loop)
 streamlit>=1.30
