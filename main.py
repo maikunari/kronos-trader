@@ -6,12 +6,17 @@ Modes:
   --mode backtest   Run historical backtest (no API keys needed)
   --mode paper      Live feed, signals logged but no real orders
   --mode live       Live trading on Hyperliquid (requires .env credentials)
+  --mode agent      LLM strategy-generation loop (see strategy_agent.py)
 
 Backtest is the primary daily-driver until paper-trading graduation. The
 live loop is intentionally small: build MarketContext each bar close,
 evaluate signal, approve via RiskManager, place via Executor+ExecutionPolicy.
 Per-bar position management (Chandelier trail + stop/target checks) is
 handled inline.
+
+Agent mode dispatches to strategy_agent.run_agent_loop. It shares no state
+with the sniper code paths — the agent imports are lazy so sniper modes
+don't pull in anthropic.
 """
 from __future__ import annotations
 
@@ -340,17 +345,59 @@ def _pnl(direction: str, entry: float, exit_p: float, size_usd: float) -> float:
 
 
 # ------------------------------------------------------------------
+# Agent mode (LLM strategy generation)
+# ------------------------------------------------------------------
+
+def cmd_agent(args, config: dict) -> int:
+    """Dispatch to strategy_agent.run_agent_loop.
+
+    Lazy-imports strategy_agent so sniper modes don't load anthropic.
+    Enforces the ANTHROPIC_API_KEY requirement unless --dry-run.
+    """
+    if not args.dry_run and not os.getenv("ANTHROPIC_API_KEY"):
+        print(
+            "ERROR: ANTHROPIC_API_KEY is not set. Use --dry-run to test "
+            "without an API key.",
+            file=sys.stderr,
+        )
+        return 1
+    from strategy_agent import run_agent_loop
+    run_agent_loop(config, args)
+    return 0
+
+
+# ------------------------------------------------------------------
 # CLI
 # ------------------------------------------------------------------
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Kronos-trader Phase 1 sniper")
-    parser.add_argument("--mode", choices=["backtest", "paper", "live"], default="backtest")
+    parser.add_argument(
+        "--mode",
+        choices=["backtest", "paper", "live", "agent"],
+        default="backtest",
+    )
     parser.add_argument("--config", default="config.yaml")
     parser.add_argument("--symbol", help="Override config symbol")
     parser.add_argument("--timeframe", help="Override config timeframe")
     parser.add_argument("--start", dest="start_date", help="Backtest start YYYY-MM-DD")
     parser.add_argument("--end", dest="end_date", help="Backtest end YYYY-MM-DD")
+
+    # Agent-mode flags (no-ops in other modes). Mirrors the flags
+    # strategy_agent.run_agent_loop reads off `args`.
+    parser.add_argument("--in-sample-start", dest="in_sample_start", default="2024-01-01")
+    parser.add_argument("--in-sample-end",   dest="in_sample_end",   default="2024-10-01")
+    parser.add_argument("--oos-start",       dest="oos_start",       default="2024-10-01")
+    parser.add_argument("--oos-end",         dest="oos_end",         default="2025-04-01")
+    parser.add_argument("--iterations", type=int, default=2,
+                        help="Agent: LLM refinement iterations")
+    parser.add_argument("--variants",   type=int, default=4,
+                        help="Agent: variants per iteration")
+    parser.add_argument("--model", default="claude-sonnet-4-6",
+                        help="Agent: Anthropic model ID")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Agent: use fixture variants + synthetic candles, no API key")
+
     args = parser.parse_args()
 
     cfg_path = Path(args.config)
@@ -361,6 +408,8 @@ def main() -> int:
 
     if args.mode == "backtest":
         return cmd_backtest(args, config)
+    if args.mode == "agent":
+        return cmd_agent(args, config)
     if args.mode == "live":
         confirm = input("WARNING: LIVE trading — real funds at risk. Type 'yes' to continue: ")
         if confirm.strip().lower() != "yes":
