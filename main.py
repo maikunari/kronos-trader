@@ -211,13 +211,24 @@ def _calc_pnl(side: str, entry: float, exit_p: float, size_usd: float) -> float:
 
 def main():
     parser = argparse.ArgumentParser(description="Kronos + TimesFM Trading Bot")
-    parser.add_argument("--mode", choices=["backtest", "paper", "live"], default="paper")
+    parser.add_argument("--mode", choices=["backtest", "paper", "live", "agent"], default="paper")
     parser.add_argument("--config", default="config.yaml")
     parser.add_argument("--symbol", help="Override symbol")
     parser.add_argument("--timeframe", help="Override timeframe")
     parser.add_argument("--start", dest="start_date")
     parser.add_argument("--end", dest="end_date")
     parser.add_argument("--plot", default="equity_curve.png")
+
+    # Agent-mode flags (ignored in other modes)
+    parser.add_argument("--in-sample-start",  dest="in_sample_start", default="2024-01-01")
+    parser.add_argument("--in-sample-end",    dest="in_sample_end",   default="2024-10-01")
+    parser.add_argument("--oos-start",        dest="oos_start",       default="2024-10-01")
+    parser.add_argument("--oos-end",          dest="oos_end",         default="2025-04-01")
+    parser.add_argument("--iterations",       type=int, default=2,    help="Agent: LLM refinement iterations")
+    parser.add_argument("--variants",         type=int, default=4,    help="Agent: variants per iteration")
+    parser.add_argument("--model",            default="claude-sonnet-4-6", help="Agent: Anthropic model ID")
+    parser.add_argument("--dry-run",          action="store_true",    help="Agent: use fixtures, no API key needed")
+
     args = parser.parse_args()
 
     if not os.path.exists(args.config):
@@ -237,6 +248,10 @@ def main():
         )
         print_report(result)
         plot_equity_curve(result, output_path=args.plot)
+
+    elif args.mode == "agent":
+        from strategy_agent import run_agent_loop
+        run_agent_loop(config, args)
 
     else:
         if args.mode == "live":

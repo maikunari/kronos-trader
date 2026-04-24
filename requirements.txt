@@ -20,3 +20,7 @@ scipy>=1.11
 
 # Utilities
 aiohttp>=3.9
+pyarrow>=14.0     # parquet support for candle caching in strategy_agent
+
+# LLM strategy agent
+anthropic>=0.40
