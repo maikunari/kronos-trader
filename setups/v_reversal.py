@@ -237,10 +237,10 @@ class VReversalDetector:
         self,
         *,
         lookback_bars: int = 120,
-        min_move_pct_long: float = 0.10,
-        min_move_pct_short: float = 0.15,
-        min_bounce_pct: float = 0.03,
-        max_bars_since_hl: int = 5,
+        min_move_pct_long: float = 0.15,      # tuned 2026-04-20 sweep: 10% -> 15%
+        min_move_pct_short: float = 0.20,     # tuned proportionally
+        min_bounce_pct: float = 0.05,         # tuned: 3% -> 5%
+        max_bars_since_hl: int = 2,           # tuned: 5 -> 2 (fresher only)
         stop_buffer_pct: float = 0.003,
         base_confidence: float = 0.70,
         size_fraction: float = 0.4,
