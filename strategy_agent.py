@@ -39,6 +39,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 import yaml
 
+from agent_infra import ASTValidationError, ASTValidator
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -106,70 +108,22 @@ class RunLog:
 # ---------------------------------------------------------------------------
 # AST Validator
 # ---------------------------------------------------------------------------
+# Uses the shared ASTValidator from agent_infra.sandbox so the trend-engine
+# and Phase C setup agents share the same safety implementation. The
+# module-level ast_validate name is preserved as a thin alias so any
+# external callers continue to work.
 
-class ASTValidationError(Exception):
-    pass
+VALIDATOR = ASTValidator(
+    allowed_imports=ALLOWED_IMPORTS,
+    forbidden_builtins=FORBIDDEN_BUILTINS,
+    required_class="Strategy",
+    required_methods=("evaluate",),
+)
 
 
 def ast_validate(source: str) -> None:
-    """
-    Parse `source` and walk the AST looking for forbidden patterns.
-    Raises ASTValidationError describing the first violation found.
-    """
-    try:
-        tree = ast.parse(source)
-    except SyntaxError as e:
-        raise ASTValidationError(f"SyntaxError: {e}") from e
-
-    for node in ast.walk(tree):
-        # Check imports
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                top = alias.name.split(".")[0]
-                if top not in ALLOWED_IMPORTS:
-                    raise ASTValidationError(
-                        f"Forbidden import: '{alias.name}'. "
-                        f"Only {sorted(ALLOWED_IMPORTS)} are allowed."
-                    )
-        elif isinstance(node, ast.ImportFrom):
-            mod = node.module or ""
-            top = mod.split(".")[0]
-            if top not in ALLOWED_IMPORTS:
-                raise ASTValidationError(
-                    f"Forbidden import from '{mod}'. "
-                    f"Only {sorted(ALLOWED_IMPORTS)} are allowed."
-                )
-            if node.level and node.level > 0:
-                raise ASTValidationError("Relative imports are not allowed.")
-
-        # Check dangerous builtin calls
-        elif isinstance(node, ast.Call):
-            func = node.func
-            name = None
-            if isinstance(func, ast.Name):
-                name = func.id
-            elif isinstance(func, ast.Attribute):
-                name = func.attr
-            if name in FORBIDDEN_BUILTINS:
-                raise ASTValidationError(
-                    f"Forbidden builtin call: '{name}()'."
-                )
-
-    # Must contain exactly one class named Strategy
-    classes = [
-        n for n in ast.walk(tree)
-        if isinstance(n, ast.ClassDef) and n.name == "Strategy"
-    ]
-    if not classes:
-        raise ASTValidationError("Module must define a class named 'Strategy'.")
-    if len(classes) > 1:
-        raise ASTValidationError("Module must define exactly one 'Strategy' class.")
-
-    # Strategy must have an evaluate method
-    strat_cls = classes[0]
-    methods = [n.name for n in ast.walk(strat_cls) if isinstance(n, ast.FunctionDef)]
-    if "evaluate" not in methods:
-        raise ASTValidationError("Strategy class must define an 'evaluate' method.")
+    """Thin alias kept for backwards-compat with existing call sites."""
+    VALIDATOR.validate(source)
 
 
 # ---------------------------------------------------------------------------
