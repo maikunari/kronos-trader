@@ -1,0 +1,72 @@
+{
+  "rows": [
+    {
+      "ticker": "BTC",
+      "trades": 821,
+      "win_rate": 0.2984165651644336,
+      "payoff_ratio": 1.2090537796078524,
+      "kelly_fraction": 0.0,
+      "growth_rate": 0.0,
+      "growth_rate_full_unit": -0.002086941941718883,
+      "mean_return": -0.002059367627107094,
+      "sharpe": -9.19482634440989,
+      "total_return_pct": -0.5357181298693289,
+      "max_drawdown_pct": 0.5378683210941673,
+      "profit_factor": 0.4807938155077422
+    },
+    {
+      "ticker": "ETH",
+      "trades": 795,
+      "win_rate": 0.33962264150943394,
+      "payoff_ratio": 1.4669716785730655,
+      "kelly_fraction": 0.0,
+      "growth_rate": 0.0,
+      "growth_rate_full_unit": -0.001582363959926584,
+      "mean_return": -0.0015057129031037129,
+      "sharpe": -4.060860998788487,
+      "total_return_pct": -0.3355436361087627,
+      "max_drawdown_pct": 0.38652458947771307,
+      "profit_factor": 0.7457529059972157
+    },
+    {
+      "ticker": "SOL",
+      "trades": 777,
+      "win_rate": 0.31917631917631917,
+      "payoff_ratio": 1.3879306863011152,
+      "kelly_fraction": 0.0,
+      "growth_rate": 0.0,
+      "growth_rate_full_unit": -0.002539415194386369,
+      "mean_return": -0.0024510042368268096,
+      "sharpe": -5.750054449288342,
+      "total_return_pct": -0.4260476216976347,
+      "max_drawdown_pct": 0.43600474701802716,
+      "profit_factor": 0.6446266259259318
+    },
+    {
+      "ticker": "HYPE",
+      "trades": 0,
+      "skipped": true,
+      "skip_reason": "no data or no trades"
+    }
+  ],
+  "pooled": {
+    "n_trades": 2393,
+    "win_rate": 0.31884663602173,
+    "payoff_ratio": 1.3948414718766926,
+    "kelly_fraction": 0.0,
+    "growth_rate": 0.0,
+    "growth_rate_full_unit": -0.002066228285972022,
+    "mean_return": -0.0020025962690500654
+  },
+  "config": {
+    "timeframe": "15m",
+    "start": "2025-04-01",
+    "end": "2026-04-01",
+    "tickers": [
+      "BTC",
+      "ETH",
+      "SOL",
+      "HYPE"
+    ]
+  }
+}
