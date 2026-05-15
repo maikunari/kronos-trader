@@ -31,6 +31,7 @@ from validation.capture import (
     median_capture_ratio,
     simulate_capture,
 )
+from validation.kelly import growth_rate, simulate_trigger_returns
 from validation.labeler import PopEvent, label_pops, pop_stats
 from validation.matcher import (
     Match,
@@ -50,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class SetupDirectionStats:
-    """Recall/precision/capture breakdown for one (setup, direction) cell."""
+    """Recall/precision/capture/Kelly breakdown for one (setup, direction) cell."""
     setup: str
     direction: str
     pops: int
@@ -64,6 +65,13 @@ class SetupDirectionStats:
     mean_realized_return: float
     median_lead_hours: Optional[float]
     exit_reasons: dict[str, int]
+    # Kelly diagnostics (computed over ALL resolved triggers, not just TPs)
+    kelly_n_trades: int = 0
+    kelly_fraction: float = 0.0
+    growth_rate: float = 0.0           # G(f*) — per-trade log-growth
+    growth_rate_full_unit: float = 0.0  # G(1.0) — naive full-bet growth
+    kelly_win_rate: float = 0.0
+    kelly_payoff_ratio: float = 0.0
 
     @property
     def passes_graduation(self) -> bool:
@@ -73,6 +81,16 @@ class SetupDirectionStats:
             and self.precision >= 0.25
             and self.median_capture_ratio >= 0.30
         )
+
+    @property
+    def has_positive_edge(self) -> bool:
+        """True if G(f*) > 0 — capital grows under Kelly sizing.
+
+        This is the Kelly-side complement to passes_graduation. A setup
+        can have positive edge without passing the §9.5 gate (low recall,
+        big edge per fire) or pass §9.5 without positive edge after fees
+        (high recall, tiny edge). Both signals are informative."""
+        return self.growth_rate > 0
 
 
 @dataclass
@@ -280,6 +298,15 @@ def _compute_stats(
             lead = median_lead_time(matches)
             lead_hours = lead.total_seconds() / 3600 if lead else None
 
+            # Kelly diagnostic — simulate EVERY trigger in this direction
+            # (TPs + FPs), pull realized returns, compute optimal Kelly
+            # fraction and per-trade growth rate G. Honest because false
+            # positives in real trading really do eat stops.
+            trigger_returns = simulate_trigger_returns(
+                trigs_dir, ticker_candles, max_hold_bars=max_hold_bars,
+            )
+            kelly = growth_rate(trigger_returns)
+
             stats.append(SetupDirectionStats(
                 setup=detector.name,
                 direction=direction,
@@ -294,6 +321,12 @@ def _compute_stats(
                 mean_realized_return=mean_realized_return(captures),
                 median_lead_hours=lead_hours,
                 exit_reasons=exit_reason_breakdown(captures),
+                kelly_n_trades=kelly.n_trades,
+                kelly_fraction=kelly.kelly_fraction,
+                growth_rate=kelly.growth_rate,
+                growth_rate_full_unit=kelly.growth_rate_full_unit,
+                kelly_win_rate=kelly.win_rate,
+                kelly_payoff_ratio=kelly.payoff_ratio,
             ))
 
     return stats
@@ -346,6 +379,31 @@ def _format_markdown(report: ValidationReport) -> str:
     lines.append("|---|---|")
     for t, n in sorted(report.per_ticker_pops.items(), key=lambda kv: -kv[1]):
         lines.append(f"| {t} | {n} |")
+    lines.append("")
+
+    # Kelly diagnostics — the Renaissance-style "does this actually grow capital?" view.
+    lines.append("## Kelly diagnostics (all triggers, TP+FP)")
+    lines.append("")
+    lines.append(
+        "G = per-trade log-growth rate at the Kelly-optimal sizing f*. "
+        "G > 0 → capital grows in the long run regardless of recall."
+    )
+    lines.append("")
+    lines.append(
+        "| setup | dir | n_trades | win% | payoff | f* | G | G(f=1) | "
+        "edge |"
+    )
+    lines.append("|---|---|---|---|---|---|---|---|---|")
+    for s in report.stats:
+        lines.append(
+            f"| {s.setup} | {s.direction} | {s.kelly_n_trades} | "
+            f"{s.kelly_win_rate*100:.1f}% | "
+            f"{s.kelly_payoff_ratio:.2f} | "
+            f"{s.kelly_fraction:.3f} | "
+            f"{s.growth_rate:+.5f} | "
+            f"{s.growth_rate_full_unit:+.5f} | "
+            f"{'✓' if s.has_positive_edge else '✗'} |"
+        )
     lines.append("")
 
     # Exit-reason breakdown per setup × direction
