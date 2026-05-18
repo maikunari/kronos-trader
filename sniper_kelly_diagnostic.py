@@ -27,6 +27,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from typing import Optional
+
 import pandas as pd
 import yaml
 
@@ -50,7 +52,13 @@ def _safe_fetch(symbol: str, timeframe: str, start_ms: int, end_ms: int) -> pd.D
     return df if df is not None else pd.DataFrame()
 
 
-def _backtest_one(symbol: str, timeframe: str, start: str, end: str, config: dict) -> BacktestResult | None:
+def _backtest_one(
+    symbol: str, timeframe: str, start: str, end: str, config: dict,
+    *,
+    fee_rate_override: Optional[float] = None,
+    slippage_base_bps_override: Optional[float] = None,
+    slippage_atr_frac_override: Optional[float] = None,
+) -> BacktestResult | None:
     start_ms = int(datetime.fromisoformat(start).replace(tzinfo=timezone.utc).timestamp() * 1000)
     end_ms = int(datetime.fromisoformat(end).replace(tzinfo=timezone.utc).timestamp() * 1000)
     df = _safe_fetch(symbol, timeframe, start_ms, end_ms)
@@ -60,14 +68,23 @@ def _backtest_one(symbol: str, timeframe: str, start: str, end: str, config: dic
     df_4h = _safe_fetch(symbol, "4h", start_ms, end_ms)
     engine = build_engine(config)
     b = config.get("backtest", {})
+    fee_rate = fee_rate_override if fee_rate_override is not None else b.get("fee_rate", 0.00035)
+    slippage_base_bps = (
+        slippage_base_bps_override if slippage_base_bps_override is not None
+        else b.get("slippage_base_bps", 2.0)
+    )
+    slippage_atr_frac = (
+        slippage_atr_frac_override if slippage_atr_frac_override is not None
+        else b.get("slippage_atr_frac", 0.05)
+    )
     return run_snipe_backtest(
         df, engine=engine,
         candles_1h=df_1h if not df_1h.empty else None,
         candles_4h=df_4h if not df_4h.empty else None,
         initial_capital=b.get("initial_capital", 10_000.0),
-        fee_rate=b.get("fee_rate", 0.00035),
-        slippage_base_bps=b.get("slippage_base_bps", 2.0),
-        slippage_atr_frac=b.get("slippage_atr_frac", 0.05),
+        fee_rate=fee_rate,
+        slippage_base_bps=slippage_base_bps,
+        slippage_atr_frac=slippage_atr_frac,
         funding_rate_hourly=b.get("funding_rate_hourly", 0.0),
         use_chandelier_trail=b.get("use_chandelier_trail", True),
         chandelier_atr_mult=b.get("chandelier_atr_mult", 3.0),
@@ -91,6 +108,17 @@ def main() -> int:
                         default=["BTC", "ETH", "SOL", "HYPE"],
                         help="Tickers to backtest (default: BTC ETH SOL HYPE)")
     parser.add_argument("--out", default="tasks/sniper_kelly_diagnostic.md")
+    # Cost-model overrides (per side; defaults match config.yaml backtest section).
+    # HL Tier 0: maker 1.5 bps, taker 4.5 bps. Bot uses post-only-first so a
+    # realistic blended fee for a mixed maker/taker mix is ~3.0 bps per side.
+    parser.add_argument("--fee-rate", type=float, default=None,
+                        help="Per-side fee rate (e.g. 0.00015 = 1.5 bps pure maker)")
+    parser.add_argument("--slippage-base-bps", type=float, default=None,
+                        help="Per-side base slippage in bps")
+    parser.add_argument("--slippage-atr-frac", type=float, default=None,
+                        help="Per-side slippage as fraction of ATR")
+    parser.add_argument("--scenario-label", default="",
+                        help="Label this scenario in the report (e.g. 'realistic maker mix')")
     args = parser.parse_args()
 
     config = yaml.safe_load(Path(args.config).read_text())
@@ -104,7 +132,12 @@ def main() -> int:
     for ticker in args.tickers:
         print(f"  backtest {ticker}...", file=sys.stderr)
         try:
-            result = _backtest_one(ticker, args.timeframe, args.start, args.end, config)
+            result = _backtest_one(
+                ticker, args.timeframe, args.start, args.end, config,
+                fee_rate_override=args.fee_rate,
+                slippage_base_bps_override=args.slippage_base_bps,
+                slippage_atr_frac_override=args.slippage_atr_frac,
+            )
         except Exception as exc:
             print(f"    skipped {ticker}: {exc}", file=sys.stderr)
             rows.append({"ticker": ticker, "trades": 0, "skipped": True,
@@ -135,13 +168,31 @@ def main() -> int:
     # Universe-pooled Kelly
     pooled = growth_rate(all_returns)
 
+    # Effective cost model used for this run
+    eff_fee = args.fee_rate if args.fee_rate is not None else config.get("backtest", {}).get("fee_rate", 0.00035)
+    eff_slip_base = (
+        args.slippage_base_bps if args.slippage_base_bps is not None
+        else config.get("backtest", {}).get("slippage_base_bps", 2.0)
+    )
+    eff_slip_atr = (
+        args.slippage_atr_frac if args.slippage_atr_frac is not None
+        else config.get("backtest", {}).get("slippage_atr_frac", 0.05)
+    )
+
     lines: list[str] = []
     lines.append("# Sniper Kelly diagnostic")
+    if args.scenario_label:
+        lines.append(f"### Scenario: **{args.scenario_label}**")
     lines.append("")
     lines.append(f"- Timeframe: {args.timeframe}")
     lines.append(f"- Window: {args.start} → {args.end}")
     lines.append(f"- Tickers: {', '.join(args.tickers)}")
     lines.append(f"- Total trades pooled: {pooled.n_trades}")
+    lines.append(
+        f"- Cost model: fee={eff_fee*10000:.2f}bps/side · "
+        f"slippage_base={eff_slip_base:.2f}bps/side · "
+        f"slippage_atr_frac={eff_slip_atr:.3f}"
+    )
     lines.append("")
 
     lines.append("## Per-ticker")

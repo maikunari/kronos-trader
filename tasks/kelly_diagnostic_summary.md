@@ -78,7 +78,37 @@ A modest improvement on either side could push G > 0. The Phase C
 setups are not even close — they're losing 12× as much per trade as
 the sniper.
 
-## Decision: drop CBS-replication, focus the sniper
+## Cost-model audit — significant lift, ETH crosses zero
+
+Re-ran the sniper Kelly diagnostic under three cost scenarios. HL Tier 0
+is 1.5 bps maker / 4.5 bps taker. The bot uses `post_only_first=True` in
+`execution_policy.py`, so realistic is a maker/taker mix — much cheaper
+than pure-taker (which the original backtest defaults effectively assume).
+
+| scenario | fee/side | slip_base | slip_atr | ETH G(f=1) | Pooled G(f=1) | ETH f* |
+|---|---|---|---|---|---|---|
+| Baseline (config.yaml defaults) | 3.5 bps | 2.0 bps | 0.05 | **-0.16%** | -0.21% | 0 |
+| Realistic (50/50 maker/taker mix) | 3.0 bps | 1.5 bps | 0.03 | **-0.08%** | -0.14% | 0 |
+| Optimistic (mostly maker + HYPE staking + referral) | 1.0 bps | 0.5 bps | 0.015 | **+0.029%** | -0.026% | **1.0** |
+
+ETH-specific results under the optimistic model:
+
+- Win rate 36.0%, payoff ratio 1.91 (closer to the architecture's 2:1 R:R)
+- f* = 1.0 (Kelly says: bet full size)
+- Total return **+7.8%** over the year
+- Max drawdown only **10.9%**
+- Sharpe 0.75
+
+BTC and SOL stay net-negative even under optimistic costs (-0.05% and
+-0.06% per trade). The pooled number stays slightly negative because
+BTC and SOL drag ETH down.
+
+**The cost model was the dominant story.** A 2.5 bps/side cost
+reduction (3.5 → 1.0) shifted ETH 19 bps per trade — from -0.16% to
++0.029%. The signal was always there; it was being eaten by
+worst-case-taker fee assumptions.
+
+## Decision: drop CBS-replication, focus the sniper (ETH-first)
 
 The math is unambiguous:
 

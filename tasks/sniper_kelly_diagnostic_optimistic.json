@@ -1,0 +1,65 @@
+{
+  "rows": [
+    {
+      "ticker": "BTC",
+      "trades": 825,
+      "win_rate": 0.3284848484848485,
+      "payoff_ratio": 1.7327176675761422,
+      "kelly_fraction": 0.0,
+      "growth_rate": 0.0,
+      "growth_rate_full_unit": -0.000507111645639286,
+      "mean_return": -0.0004815565822302932,
+      "sharpe": -2.5032055625160488,
+      "total_return_pct": -0.18084446844419344,
+      "max_drawdown_pct": 0.19820565040436022,
+      "profit_factor": 0.8186008861872629
+    },
+    {
+      "ticker": "ETH",
+      "trades": 797,
+      "win_rate": 0.3601003764115433,
+      "payoff_ratio": 1.90714956669208,
+      "kelly_fraction": 1.0,
+      "growth_rate": 0.000285239268381156,
+      "growth_rate_full_unit": 0.000285239268381156,
+      "mean_return": 0.00036048011514343547,
+      "sharpe": 0.7524221932588642,
+      "total_return_pct": 0.07797628667114168,
+      "max_drawdown_pct": 0.10947870002872391,
+      "profit_factor": 1.0585966631818717
+    },
+    {
+      "ticker": "SOL",
+      "trades": 778,
+      "win_rate": 0.33676092544987146,
+      "payoff_ratio": 1.8054505019654008,
+      "kelly_fraction": 0.0,
+      "growth_rate": 0.0,
+      "growth_rate_full_unit": -0.0005577298165524462,
+      "mean_return": -0.00047314050742579684,
+      "sharpe": -1.1411484539972718,
+      "total_return_pct": -0.10216127426790554,
+      "max_drawdown_pct": 0.13196970456404805,
+      "profit_factor": 0.9139201407912644
+    }
+  ],
+  "pooled": {
+    "n_trades": 2400,
+    "win_rate": 0.3416666666666667,
+    "payoff_ratio": 1.8426998937353942,
+    "kelly_fraction": 0.0,
+    "growth_rate": 0.0,
+    "growth_rate_full_unit": -0.0002603938366793468,
+    "mean_return": -0.00019920201806164354
+  },
+  "config": {
+    "timeframe": "15m",
+    "start": "2025-04-01",
+    "end": "2026-04-01",
+    "tickers": [
+      "BTC",
+      "ETH",
+      "SOL"
+    ]
+  }
+}
