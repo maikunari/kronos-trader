@@ -1,0 +1,22 @@
+# grids/eth_kelly_sweep.yaml
+#
+# Focused parameter sweep for the ETH-on-sniper Kelly verification run.
+# 8 combos (2 × 2 × 2) so a full walk-forward at step=30d (≈10 folds)
+# finishes in roughly 60-90 minutes.
+#
+# The diagnostic on ETH at default params already shows positive in-sample
+# G under optimistic costs (+0.029% / trade, Sharpe 0.75). This grid
+# probes whether the positive G survives walk-forward OOS folds, and
+# whether tighter or wider stops/targets do better.
+
+donchian_period:
+  - 20
+  - 30
+
+stop_atr_mult:
+  - 1.0
+  - 1.5
+
+target_atr_mult:
+  - 2.0
+  - 3.0

@@ -31,6 +31,7 @@ from backtest import WalkForwardFold, walk_forward
 from hyperliquid_feed import TIMEFRAME_MS, fetch_historical_binance, fetch_historical_hl
 from regime import RegimeDetector
 from snipe_signal_engine import SnipeSignalEngine
+from validation.kelly import growth_rate
 
 logger = logging.getLogger(__name__)
 
@@ -89,12 +90,20 @@ def build_engine_from_params(params: dict) -> SnipeSignalEngine:
 # ------------------------------------------------------------------
 
 def aggregate_folds(folds: list[WalkForwardFold]) -> dict:
-    """Summarize per-fold OOS results into medians/means for ranking."""
+    """Summarize per-fold OOS results — Sharpe stats AND pooled Kelly G.
+
+    Kelly G is computed by pooling every OOS trade across all folds into
+    a single returns vector, then running growth_rate(). This gives a
+    single per-trade log-growth-rate diagnostic that's directly
+    comparable to the sniper_kelly_diagnostic.py reports.
+    """
     if not folds:
         return {
             "folds": 0, "median_oos_sharpe": 0.0, "mean_oos_return": 0.0,
             "median_oos_max_dd": 0.0, "total_trades": 0, "median_oos_win_rate": 0.0,
             "median_oos_profit_factor": 0.0,
+            "kelly_fraction": 0.0, "growth_rate": 0.0, "growth_rate_full_unit": 0.0,
+            "kelly_win_rate": 0.0, "kelly_payoff_ratio": 0.0,
         }
     sharpes = [f.oos_result.sharpe_ratio for f in folds]
     returns = [f.oos_result.total_return_pct for f in folds]
@@ -102,6 +111,15 @@ def aggregate_folds(folds: list[WalkForwardFold]) -> dict:
     win_rates = [f.oos_result.win_rate for f in folds]
     pfs = [f.oos_result.profit_factor for f in folds]
     trades = sum(f.oos_result.trades_count for f in folds)
+
+    # Pool per-trade returns across all folds for honest cross-fold Kelly
+    per_trade_returns: list[float] = []
+    for f in folds:
+        for t in f.oos_result.trades:
+            if t.size_usd > 0:
+                per_trade_returns.append(t.pnl_usd / t.size_usd)
+    kelly = growth_rate(per_trade_returns)
+
     return {
         "folds": len(folds),
         "median_oos_sharpe": float(np.median(sharpes)),
@@ -111,6 +129,11 @@ def aggregate_folds(folds: list[WalkForwardFold]) -> dict:
         "median_oos_win_rate": float(np.median(win_rates)),
         "median_oos_profit_factor": float(np.median(pfs)),
         "total_trades": trades,
+        "kelly_fraction": kelly.kelly_fraction,
+        "growth_rate": kelly.growth_rate,
+        "growth_rate_full_unit": kelly.growth_rate_full_unit,
+        "kelly_win_rate": kelly.win_rate,
+        "kelly_payoff_ratio": kelly.payoff_ratio,
     }
 
 
@@ -128,10 +151,16 @@ def grid_search(
     step_days: Optional[int] = None,
     backtest_kwargs: Optional[dict] = None,
     progress: Optional[Callable[[int, int, dict], None]] = None,
+    rank_by: str = "g",
 ) -> list[dict]:
     """
     Run walk-forward on each combination of `grid`. Returns all results
-    sorted by median OOS Sharpe descending.
+    sorted by the chosen ranking metric.
+
+    Args:
+        rank_by: 'g' (default — pooled OOS Kelly growth rate, the
+                 survival criterion), or 'sharpe' (median OOS Sharpe,
+                 the legacy ranking).
     """
     combos = expand_grid(grid)
     logger.info("Optimizer: %d param combinations x WF folds", len(combos))
@@ -156,7 +185,16 @@ def grid_search(
         if progress:
             progress(idx + 1, len(combos), record)
 
-    results.sort(key=lambda r: (r["median_oos_sharpe"], r["mean_oos_return"]), reverse=True)
+    if rank_by == "g":
+        results.sort(
+            key=lambda r: (r["growth_rate"], r["growth_rate_full_unit"], r["median_oos_sharpe"]),
+            reverse=True,
+        )
+    else:
+        results.sort(
+            key=lambda r: (r["median_oos_sharpe"], r["mean_oos_return"]),
+            reverse=True,
+        )
     return results
 
 
@@ -192,6 +230,17 @@ def main() -> int:
     parser.add_argument("--in-sample-days", type=int, default=60)
     parser.add_argument("--oos-days", type=int, default=14)
     parser.add_argument("--embargo-days", type=int, default=1)
+    parser.add_argument(
+        "--rank-by", choices=["g", "sharpe"], default="g",
+        help="Ranking metric: 'g' = pooled Kelly growth rate (default), "
+             "'sharpe' = median OOS Sharpe (legacy).",
+    )
+    # Cost-model overrides — pass through to the backtester so we can
+    # tune under realistic-vs-pessimistic HL fee assumptions.
+    parser.add_argument("--fee-rate", type=float, default=None,
+                        help="Per-side fee rate (default 0.00035 = 3.5 bps taker)")
+    parser.add_argument("--slippage-base-bps", type=float, default=None)
+    parser.add_argument("--slippage-atr-frac", type=float, default=None)
     args = parser.parse_args()
 
     grid = _load_grid(args.grid)
@@ -200,14 +249,23 @@ def main() -> int:
 
     def progress(i: int, total: int, rec: dict) -> None:
         logger.info(
-            "[%d/%d] sharpe=%.2f ret=%.2f%% dd=%.2f%% wr=%.1f%% trades=%d params=%s",
-            i, total, rec["median_oos_sharpe"], rec["mean_oos_return"] * 100,
+            "[%d/%d] G=%+.5f f*=%.2f sharpe=%.2f ret=%.2f%% dd=%.2f%% "
+            "wr=%.1f%% trades=%d params=%s",
+            i, total, rec["growth_rate"], rec["kelly_fraction"],
+            rec["median_oos_sharpe"], rec["mean_oos_return"] * 100,
             rec["median_oos_max_dd"] * 100, rec["median_oos_win_rate"] * 100,
             rec["total_trades"], rec["params"],
         )
 
     # Auto-infer bars_per_year so Sharpe is correctly annualized at any timeframe
     backtest_kwargs = {"bars_per_year": bars_per_year_for(args.timeframe)}
+    if args.fee_rate is not None:
+        backtest_kwargs["fee_rate"] = args.fee_rate
+    if args.slippage_base_bps is not None:
+        backtest_kwargs["slippage_base_bps"] = args.slippage_base_bps
+    if args.slippage_atr_frac is not None:
+        backtest_kwargs["slippage_atr_frac"] = args.slippage_atr_frac
+
     results = grid_search(
         df, grid,
         in_sample_days=args.in_sample_days,
@@ -215,6 +273,7 @@ def main() -> int:
         embargo_days=args.embargo_days,
         progress=progress,
         backtest_kwargs=backtest_kwargs,
+        rank_by=args.rank_by,
     )
     Path(args.out).write_text(json.dumps({
         "symbol": args.symbol, "timeframe": args.timeframe,
