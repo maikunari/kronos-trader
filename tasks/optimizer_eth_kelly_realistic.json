@@ -1,0 +1,182 @@
+{
+  "symbol": "ETH",
+  "timeframe": "15m",
+  "start": "2025-04-01",
+  "end": "2026-04-01",
+  "grid": {
+    "donchian_period": [
+      20,
+      30
+    ],
+    "stop_atr_mult": [
+      1.0,
+      1.5
+    ],
+    "target_atr_mult": [
+      2.0,
+      3.0
+    ]
+  },
+  "results": [
+    {
+      "params": {
+        "donchian_period": 30,
+        "stop_atr_mult": 1.0,
+        "target_atr_mult": 3.0
+      },
+      "folds": 21,
+      "median_oos_sharpe": -7.124798229282301,
+      "mean_oos_sharpe": -6.782098914185882,
+      "mean_oos_return": -0.016778641014477933,
+      "median_oos_max_dd": 0.024451944514494426,
+      "median_oos_win_rate": 0.23809523809523808,
+      "median_oos_profit_factor": 0.6311446285717685,
+      "total_trades": 645,
+      "kelly_fraction": 0.0,
+      "growth_rate": 0.0,
+      "growth_rate_full_unit": -0.0018199523064994266,
+      "kelly_win_rate": 0.26046511627906976,
+      "kelly_payoff_ratio": 1.8384591328474547
+    },
+    {
+      "params": {
+        "donchian_period": 20,
+        "stop_atr_mult": 1.0,
+        "target_atr_mult": 3.0
+      },
+      "folds": 21,
+      "median_oos_sharpe": -7.061260897221405,
+      "mean_oos_sharpe": -7.208745900192773,
+      "mean_oos_return": -0.019092901192745343,
+      "median_oos_max_dd": 0.026346176846163142,
+      "median_oos_win_rate": 0.22857142857142856,
+      "median_oos_profit_factor": 0.5934773245621928,
+      "total_trades": 738,
+      "kelly_fraction": 0.0,
+      "growth_rate": 0.0,
+      "growth_rate_full_unit": -0.001834777855573538,
+      "kelly_win_rate": 0.25474254742547425,
+      "kelly_payoff_ratio": 1.870041330528418
+    },
+    {
+      "params": {
+        "donchian_period": 20,
+        "stop_atr_mult": 1.0,
+        "target_atr_mult": 2.0
+      },
+      "folds": 21,
+      "median_oos_sharpe": -9.54380003493898,
+      "mean_oos_sharpe": -9.422920208664024,
+      "mean_oos_return": -0.023376239735125585,
+      "median_oos_max_dd": 0.028452924029590213,
+      "median_oos_win_rate": 0.29411764705882354,
+      "median_oos_profit_factor": 0.5590001297159369,
+      "total_trades": 844,
+      "kelly_fraction": 0.0,
+      "growth_rate": 0.0,
+      "growth_rate_full_unit": -0.0019657435495624744,
+      "kelly_win_rate": 0.3175355450236967,
+      "kelly_payoff_ratio": 1.2843297585175792
+    },
+    {
+      "params": {
+        "donchian_period": 30,
+        "stop_atr_mult": 1.0,
+        "target_atr_mult": 2.0
+      },
+      "folds": 21,
+      "median_oos_sharpe": -9.034518046031835,
+      "mean_oos_sharpe": -8.818136255897818,
+      "mean_oos_return": -0.020887478585755882,
+      "median_oos_max_dd": 0.02393761229060438,
+      "median_oos_win_rate": 0.2972972972972973,
+      "median_oos_profit_factor": 0.5414900217892447,
+      "total_trades": 736,
+      "kelly_fraction": 0.0,
+      "growth_rate": 0.0,
+      "growth_rate_full_unit": -0.002000114627134363,
+      "kelly_win_rate": 0.31657608695652173,
+      "kelly_payoff_ratio": 1.29489118968785
+    },
+    {
+      "params": {
+        "donchian_period": 20,
+        "stop_atr_mult": 1.5,
+        "target_atr_mult": 3.0
+      },
+      "folds": 21,
+      "median_oos_sharpe": -6.302208118473223,
+      "mean_oos_sharpe": -7.197957049773235,
+      "mean_oos_return": -0.021119669065192186,
+      "median_oos_max_dd": 0.028146461083753457,
+      "median_oos_win_rate": 0.2894736842105263,
+      "median_oos_profit_factor": 0.6493240927440048,
+      "total_trades": 686,
+      "kelly_fraction": 0.0,
+      "growth_rate": 0.0,
+      "growth_rate_full_unit": -0.002090784477221197,
+      "kelly_win_rate": 0.29737609329446063,
+      "kelly_payoff_ratio": 1.5389189086495458
+    },
+    {
+      "params": {
+        "donchian_period": 30,
+        "stop_atr_mult": 1.5,
+        "target_atr_mult": 3.0
+      },
+      "folds": 21,
+      "median_oos_sharpe": -6.194172228557171,
+      "mean_oos_sharpe": -6.745995468461875,
+      "mean_oos_return": -0.018670238133212703,
+      "median_oos_max_dd": 0.02637133372876609,
+      "median_oos_win_rate": 0.28,
+      "median_oos_profit_factor": 0.6214694749956605,
+      "total_trades": 600,
+      "kelly_fraction": 0.0,
+      "growth_rate": 0.0,
+      "growth_rate_full_unit": -0.002133796590605716,
+      "kelly_win_rate": 0.30333333333333334,
+      "kelly_payoff_ratio": 1.4959875955782014
+    },
+    {
+      "params": {
+        "donchian_period": 30,
+        "stop_atr_mult": 1.5,
+        "target_atr_mult": 2.0
+      },
+      "folds": 21,
+      "median_oos_sharpe": -9.439924700378326,
+      "mean_oos_sharpe": -8.138118085348774,
+      "mean_oos_return": -0.02194306144650306,
+      "median_oos_max_dd": 0.027436474017016734,
+      "median_oos_win_rate": 0.3333333333333333,
+      "median_oos_profit_factor": 0.5215072726289919,
+      "total_trades": 697,
+      "kelly_fraction": 0.0,
+      "growth_rate": 0.0,
+      "growth_rate_full_unit": -0.002165493898721063,
+      "kelly_win_rate": 0.381635581061693,
+      "kelly_payoff_ratio": 1.0183665852518622
+    },
+    {
+      "params": {
+        "donchian_period": 20,
+        "stop_atr_mult": 1.5,
+        "target_atr_mult": 2.0
+      },
+      "folds": 21,
+      "median_oos_sharpe": -8.979187450348622,
+      "mean_oos_sharpe": -8.944628412707553,
+      "mean_oos_return": -0.025248137788762014,
+      "median_oos_max_dd": 0.028347651130347266,
+      "median_oos_win_rate": 0.35135135135135137,
+      "median_oos_profit_factor": 0.5655053601992147,
+      "total_trades": 801,
+      "kelly_fraction": 0.0,
+      "growth_rate": 0.0,
+      "growth_rate_full_unit": -0.0021844786279232808,
+      "kelly_win_rate": 0.37702871410736577,
+      "kelly_payoff_ratio": 1.019719134603572
+    }
+  ]
+}
